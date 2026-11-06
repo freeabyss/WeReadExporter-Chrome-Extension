@@ -1,0 +1,26 @@
+{
+  "name": "weread-exporter-extension",
+  "version": "1.0.0",
+  "private": true,
+  "description": "微信读书导出助手：Chrome 扩展（MV3），一键导出章节或整本书全文，支持 Markdown / HTML / TXT。",
+  "keywords": [
+    "weread",
+    "微信读书",
+    "chrome-extension",
+    "markdown",
+    "export"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test tests/",
+    "test:chrome": "node tools/chrome-smoke.mjs",
+    "icons": "python3 tools/make-icons.py",
+    "package": "node tools/package.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^31.0.0"
+  }
+}

@@ -1,0 +1,168 @@
+{
+  "encode": [
+    {
+      "input": "43208843",
+      "expected": "c9c321c07293508bc9c79df"
+    },
+    {
+      "input": "2",
+      "expected": "c81322c012c81e728d9d180"
+    },
+    {
+      "input": "119",
+      "expected": "07e323f027707e1cd7dc674"
+    },
+    {
+      "input": "900001",
+      "expected": "5a132dc05dbba15a1c0523f"
+    },
+    {
+      "input": "MP_WXS_3286016687",
+      "expected": "b4f42cb224d505f5758535f3332383630313636383721d"
+    },
+    {
+      "input": "1765001249",
+      "expected": "ff0327907a852d9cg0197ac"
+    },
+    {
+      "input": "abcdefg",
+      "expected": "7ac42640e61626364656667804"
+    }
+  ],
+  "sign": [
+    {
+      "bookId": "26211970",
+      "chapterUid": "1",
+      "psvts": "ps129e",
+      "ct": 1765000000,
+      "r": "18922500",
+      "expected": {
+        "b": "4a4323f0718ff6824a40316",
+        "c": "c4c329b011c4ca4238a0201",
+        "r": "18922500",
+        "ct": "1765000000",
+        "ps": "ps129e",
+        "pc": "2a1326607a852d20g0109f8",
+        "sc": 1,
+        "prevChapter": false,
+        "st": 0,
+        "s": "718f6c66"
+      }
+    },
+    {
+      "bookId": "123456789012",
+      "chapterUid": "1",
+      "psvts": "psc58a",
+      "ct": 1765000137,
+      "r": "95844100",
+      "expected": {
+        "b": "341326f0775bcd15g01c007",
+        "c": "c4c329b011c4ca4238a0201",
+        "r": "95844100",
+        "ct": "1765000137",
+        "ps": "psc58a",
+        "pc": "7b832f007a852d2dg0174f7",
+        "sc": 1,
+        "prevChapter": false,
+        "st": 0,
+        "s": "6a40ea03"
+      }
+    },
+    {
+      "bookId": "43208843",
+      "chapterUid": "2",
+      "psvts": "psf1d1",
+      "ct": 1765000274,
+      "r": "5428900",
+      "expected": {
+        "b": "c9c321c07293508bc9c79df",
+        "c": "c81322c012c81e728d9d180",
+        "r": "5428900",
+        "ct": "1765000274",
+        "ps": "psf1d1",
+        "pc": "ef6321c07a852d3bg014646",
+        "sc": 1,
+        "prevChapter": false,
+        "st": 0,
+        "s": "7eb1655c"
+      }
+    },
+    {
+      "bookId": "26211970",
+      "chapterUid": "36",
+      "psvts": "ps7964",
+      "ct": 1765000411,
+      "r": "62663056",
+      "expected": {
+        "b": "4a4323f0718ff6824a40316",
+        "c": "19c3222022419ca14e7eef7",
+        "r": "62663056",
+        "ct": "1765000411",
+        "ps": "ps7964",
+        "pc": "54932a207a852d49g011fb8",
+        "sc": 1,
+        "prevChapter": false,
+        "st": 0,
+        "s": "b97f03cb"
+      }
+    },
+    {
+      "bookId": "43208843",
+      "chapterUid": "4",
+      "psvts": "psf309",
+      "ct": 1765000548,
+      "r": "50197225",
+      "expected": {
+        "b": "c9c321c07293508bc9c79df",
+        "c": "a87322c014a87ff679a21ea",
+        "r": "50197225",
+        "ct": "1765000548",
+        "ps": "psf309",
+        "pc": "5d7326807a852d56g018fde",
+        "sc": 1,
+        "prevChapter": false,
+        "st": 0,
+        "s": "84428b3d"
+      }
+    },
+    {
+      "bookId": "123456789012",
+      "chapterUid": "2",
+      "psvts": "psd21b",
+      "ct": 1765000685,
+      "r": "21104836",
+      "expected": {
+        "b": "341326f0775bcd15g01c007",
+        "c": "c81322c012c81e728d9d180",
+        "r": "21104836",
+        "ct": "1765000685",
+        "ps": "psd21b",
+        "pc": "cc432d607a852d64g0159c1",
+        "sc": 1,
+        "prevChapter": false,
+        "st": 0,
+        "s": "969b4dc3"
+      }
+    }
+  ],
+  "shards": [
+    {
+      "shards": [
+        "C10BAAD63B3EBC74AA670808F981295B0PGh0bWwgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGh0bWwiPjxoZ_6kPjx0aXRsZT7nrKzkuIDnq6A8L3RpdGxlPjwvaGVhZD48",
+        "ED5B7C7F49E1BC303AF47E9FC12D104DYm9keT4vaDE-56ys5LiAuOugIOWQr-eoi2l8aDE-PHA-56qX5aSW55qE6aOO56mWFL-H5qCR5qKi77yM5bim5pzw6L-c5aSE5-mx6LC355qE5",
+        "E1AF7D3A5533E8BA7DE1FACB79E12AFEZue5aOw44CCPC9wPjxwPuesrOS6jOasoee_ubGhte-8jOeci-ingSDwn4y_IOS4j56AjOW8leWPt-OAjeOAgjwvcD48L2JvZHk-PC9odG1sPg"
+      ],
+      "expected": "<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><title>第一章</title></head><body><h1>第一章 启程</h1><p>窗外的风穿过树梢，带来远处山谷的回声。</p><p>第二次翻页，看见 🌿 与「引号」。</p></body></html>",
+      "referenceDecoded": "<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><title>第一章</title></head><body><h1>第一章 启程</h1><p>窗外的风穿过树梢，带来远处山谷的回声。</p><p>第二次翻页，看见 🌿 与「引号」。</p></body></html>"
+    },
+    {
+      "shards": [
+        "44CA2BBA77649F274D019DE8CEC69DF00PGh0bWw-PGJvZHk-PHA-56ysMeaute-8muaIkeS7rOayv-edgOWwj-i3r-aFouaFouWJjeihjO-8jOiusOS4i-ayv-mAlOeahOeBr-WFieOAgea6quawtOWSjOmZjOeUn-S6uueahOmXruWAmeOAgjwvcD48cD7nrKwy5q6177ya5oiR5Lus5rK_552A5bCP6Lev5oWi5oWi5YmN6KGM77yM6K6w5LiL5rK_6YCU55qE54Gv5YWJ44CB5rqq5rC05ZKM6ZmM55Sf5Lq655qE6Zeu5YCZ44CCPC9wPjxwPuesrDPmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysNOaute-8muaIkeS7rOayv-edgOWwj-i3r-aFouaFouWJjeihjO-8jOiusOS4i-ayv-mAlOeahOeBr-WFieOAgea6quawtOWSjOmZjOeUn-S6uueahOmXruWAmeOAgjwvcD48cD7nrKw15q6177ya5oiR5Lus5rK_552A5bCP6Lev5oWi5oWi5YmN6KGM77yM6K6w5LiL5rK_6YCU55qE54Gv5YWJ44CB5rqq5rC05ZKM6ZmM55Sf5Lq655qE6Zeu5YCZ44CCPC9wPjxwPuesrDbmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysN-aute-8muaIkeS7rOayv-edgOWwj-i3r-aFouaFouWJjeihjO-8jOiusOS4i-ayv-mAlOeahOeBr-WFieOAgea6quawtOWSjOmZjOeUn-S6uueahOmXruWAmeOAgjwvcD48cD7nrKw45q6177ya5oiR5Lus5rK_552A5bCP6Lev5oWi5oWi5YmN6KGM77yM6K6w5LiL5rK_6YCU55qE54Gv5YWJ44CB5rqq5rC05ZKM6ZmM55Sf5Lq655qE6Zeu5YCZ44CCPC9wPhawPuesrDnmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmmopl67lgJnjgII8L3A-PHA-56ysMTDmrrXvvJrmiJHku6zmsr_niJDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMTHmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMTLmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMTPmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMTTmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmh",
+        "CF25286BC0E8231A022C8344DBE6CA86aLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMTXmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMTbmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMTfmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMTjmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMTnmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMjDmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMjHmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMjLmrrXvvJrmnYHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMjPmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMjTmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMjXmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMjbmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMjfmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTl",
+        "9E6BA79305CA918FCF701F08060C07EBkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMjjmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMjnmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMzDmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmjxLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMzHmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMzLmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMzPmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMzTmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMzXmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMzbmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMzfmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnoTTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMzjmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysMznmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PHA-56ysNDDmrrXvvJrmiJHku6zmsr_nnYDlsI_ot6_mhaLmhaLliY3ooYzvvIzorrDkuIvmsr_pgJTnmoTnga_lhYnjgIHmuqrmsLTlkozpmYznlJ_kurrnmoTpl67lgJnjgII8L3A-PC9ib2R5PjwvaHRtbD4"
+      ],
+      "expected": "<html><body><p>第1段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第2段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第3段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第4段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第5段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第6段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第7段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第8段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第9段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第10段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第11段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第12段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第13段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第14段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第15段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第16段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第17段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第18段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第19段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第20段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第21段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第22段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第23段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第24段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第25段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第26段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第27段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第28段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第29段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第30段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第31段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第32段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第33段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第34段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第35段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第36段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第37段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第38段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第39段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第40段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p></body></html>",
+      "referenceDecoded": "<html><body><p>第1段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第2段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第3段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第4段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第5段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第6段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第7段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第8段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第9段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第10段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第11段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第12段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第13段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第14段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第15段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第16段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第17段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第18段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第19段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第20段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第21段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第22段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第23段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第24段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第25段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第26段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第27段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第28段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第29段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第30段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第31段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第32段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第33段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第34段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第35段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第36段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第37段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第38段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第39段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p><p>第40段：我们沿着小路慢慢前行，记下沿途的灯光、溪水和陌生人的问候。</p></body></html>"
+    }
+  ]
+}

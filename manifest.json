@@ -1,0 +1,49 @@
+{
+  "manifest_version": 3,
+  "name": "微信读书导出助手 · 全文导出",
+  "short_name": "微信读书导出",
+  "version": "1.0.0",
+  "description": "在微信读书网页版一键导出当前章节或整本书全文，支持 Markdown / HTML / TXT。修复原脚本只能拿到试读片段、无法导出全文的问题。",
+  "minimum_chrome_version": "102",
+  "permissions": [
+    "clipboardWrite"
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "微信读书导出助手",
+    "default_popup": "src/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://weread.qq.com/web/reader/*"
+      ],
+      "js": [
+        "src/vendor/turndown.js",
+        "src/lib/namespace.js",
+        "src/lib/md5.js",
+        "src/lib/weread-hash.js",
+        "src/lib/weread-decode.js",
+        "src/lib/weread-state.js",
+        "src/lib/weread-api.js",
+        "src/lib/formats.js",
+        "src/lib/exporter.js",
+        "src/ui.js",
+        "src/content.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ]
+}
