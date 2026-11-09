@@ -32,37 +32,46 @@ def build(size: int) -> Image.Image:
         )
         grad_draw.line([(0, y), (s, y)], fill=color)
 
+    pad = s * 0.125
+    inner = int(s - 2 * pad)
     mask = Image.new("L", (s, s), 0)
-    ImageDraw.Draw(mask).rounded_rectangle([0, 0, s - 1, s - 1], radius=int(s * 0.225), fill=255)
+    ImageDraw.Draw(mask).rounded_rectangle(
+        [pad, pad, pad + inner - 1, pad + inner - 1], radius=int(inner * 0.225), fill=255
+    )
     canvas.paste(gradient, (0, 0), mask)
 
     draw = ImageDraw.Draw(canvas)
 
-    # 向下箭头
-    shaft_w = s * 0.155
-    cx = s / 2
-    shaft_top = s * 0.17
-    shaft_bottom = s * 0.47
+    # 官方图标规范：正方形图案占 96x96，四周各留 16px 透明边距（合计 128x128）。
+    # https://developer.chrome.com/docs/webstore/images
+    a = s - 2 * pad
+    x0 = pad
+
+    # 向下箭头（坐标均相对于内部 96x96 方框）
+    shaft_w = a * 0.19
+    cx = x0 + a / 2
+    shaft_top = x0 + a * 0.20
+    shaft_bottom = x0 + a * 0.55
     draw.rounded_rectangle(
         [cx - shaft_w / 2, shaft_top, cx + shaft_w / 2, shaft_bottom],
         radius=shaft_w / 2,
         fill=WHITE,
     )
 
-    head_half = s * 0.215
-    head_top = s * 0.46
-    head_bottom = s * 0.70
+    head_half = a * 0.27
+    head_top = x0 + a * 0.54
+    head_bottom = x0 + a * 0.75
     draw.polygon(
         [(cx - head_half, head_top), (cx + head_half, head_top), (cx, head_bottom)],
         fill=WHITE,
     )
 
     # 底部托盘
-    tray_top = s * 0.775
-    tray_bottom = s * 0.855
+    tray_top = x0 + a * 0.84
+    tray_bottom = x0 + a * 0.94
     draw.rounded_rectangle(
-        [s * 0.225, tray_top, s * 0.775, tray_bottom],
-        radius=s * 0.045,
+        [x0 + a * 0.16, tray_top, x0 + a * 0.84, tray_bottom],
+        radius=a * 0.055,
         fill=WHITE,
     )
 

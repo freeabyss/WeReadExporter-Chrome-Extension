@@ -4,6 +4,11 @@
 
 本项目由 [WeReadExporter-Tampermonkey](https://github.com/henonguan1688-lab/WeReadExporter-Tampermonkey) 的油猴脚本改造为 **Chrome 扩展（Manifest V3）**，并修复了原脚本 **无法导出全文** 的问题。
 
+> **公开仓库**：https://github.com/freeabyss/WeReadExporter-Chrome-Extension
+> **下载 / Release**：https://github.com/freeabyss/WeReadExporter-Chrome-Extension/releases
+> **上架 Chrome 网上应用店指南**：[docs/PUBLISH.md](docs/PUBLISH.md)（含审核政策风险、商店素材、可直接粘贴的文案）
+> **隐私政策**：[PRIVACY.md](PRIVACY.md)
+
 ![面板截图](docs/panel.png)
 
 ---
@@ -61,15 +66,20 @@ sc: 0   // ← 只会返回一小段试读
 4. 打开 <https://weread.qq.com/web/shelf> 并进入任意一本书的阅读页；
 5. 页面右下角出现蓝色 **「导出」** 悬浮按钮。
 
-### 方式 B：使用打包好的 zip
+### 方式 B：下载 Release（推荐给普通用户）
+
+到 <https://github.com/freeabyss/WeReadExporter-Chrome-Extension/releases> 下载 `weread-exporter-v1.0.0.zip`，
+解压后在 `chrome://extensions/` 中选择解压出来的目录加载即可。
+
+### 方式 C：自行打包（开发用）
 
 ```bash
-npm run package      # 生成 dist/weread-exporter-v1.0.0.zip
+npm run package          # 给用户手动加载的完整 zip：dist/weread-exporter-v1.0.0.zip
+npm run package:store    # 上传商店用的精简 zip：dist/weread-exporter-store-v1.0.0.zip
 ```
 
-解压后，在 `chrome://extensions/` 中选择解压出来的目录加载即可。
-
 > 支持 Chrome / Edge 等 Chromium 内核浏览器（要求 Chrome 102+，实测 Chrome 156）。
+> 上架 Chrome 网上应用店的完整流程（账号注册、素材、文案、权限说明、审核风险）见 [docs/PUBLISH.md](docs/PUBLISH.md)。
 
 ---
 
@@ -137,9 +147,13 @@ npm run package      # 生成 dist/weread-exporter-v1.0.0.zip
 │   │   └── exporter.js      # 整本导出、缓存、重试、完整性校验
 │   └── vendor/turndown.js   # HTML → Markdown（MIT）
 ├── icons/                   # 16/32/48/128 图标（tools/make-icons.py 生成）
+├── store/                   # Chrome 商店素材：截图 / 宣传图（tools/make-store-assets.py 生成）
 ├── tests/                   # Node 测试 + jsdom 集成测试 + 参考向量
-├── tools/                   # 图标生成、Chrome 冒烟测试、打包脚本
-├── docs/panel.png
+├── tools/                   # 图标与素材生成、Chrome 冒烟测试、打包脚本
+├── docs/
+│   ├── panel.png            # 真实 Chrome 截图
+│   └── PUBLISH.md           # 上架 Chrome 网上应用店完整指南
+├── PRIVACY.md               # 隐私政策（商店审核用）
 ├── legacy/main.user.js      # 原油猴脚本（保留，便于对照）
 └── README.md
 ```
@@ -149,11 +163,13 @@ npm run package      # 生成 dist/weread-exporter-v1.0.0.zip
 ## 七、开发与测试
 
 ```bash
-npm install          # 仅测试需要 jsdom
-npm test             # 26 个单元 + 集成测试
-npm run test:chrome  # 真实 Chrome（headless + CDP）端到端冒烟测试
-npm run icons        # 重新生成图标（需要 Pillow）
-npm run package      # 打包 zip
+npm install              # 仅测试需要 jsdom
+npm test                 # 26 个单元 + 集成测试
+npm run test:chrome      # 真实 Chrome（headless + CDP）端到端冒烟测试
+npm run icons            # 重新生成图标（需要 Pillow）
+npm run store:assets     # 重新生成商店截图与宣传图（需要 Pillow）
+npm run package          # 打包给用户加载的完整 zip
+npm run package:store    # 打包上传 Chrome 商店的精简 zip
 ```
 
 测试覆盖：
