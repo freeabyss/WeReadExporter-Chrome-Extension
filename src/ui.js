@@ -21,7 +21,6 @@
     maxAttempts: 3,
     refreshEvery: 40,
     frontMatter: true,
-    includeNotes: true,
     includePopular: false,
   };
 
@@ -290,6 +289,14 @@
       outline: 2px solid var(--wrx-primary); outline-offset: 2px;
     }
     fieldset.notes-opts .hint { margin: 4px 0 0; font-size: 10.5px; line-height: 1.5; color: var(--wrx-muted); }
+    .primary-actions { margin-top: 8px; }
+    button.primary.split { width: auto; flex: 1; margin-top: 0; }
+    button.primary.split.secondary {
+      background: var(--wrx-bg); color: var(--wrx-primary);
+      border: 1px solid rgba(47,107,255,.45); box-shadow: none;
+    }
+    button.primary.split.secondary:hover:not(:disabled) { background: rgba(47,107,255,.07); }
+    button.primary.split.secondary:disabled { opacity: .5; cursor: not-allowed; }
     button.shelf-btn {
       width: 100%; margin-top: 7px; padding: 7px 10px;
       border-radius: 9px; border: 1px dashed var(--wrx-border);
@@ -346,7 +353,6 @@
     settings.maxAttempts = clamp(Number(settings.maxAttempts) || 3, 1, 5);
     settings.refreshEvery = clamp(Number(settings.refreshEvery) || 0, 0, 500);
     settings.frontMatter = settings.frontMatter !== false;
-    settings.includeNotes = settings.includeNotes !== false;
     settings.includePopular = settings.includePopular === true;
     return settings;
   }
@@ -481,21 +487,20 @@
                 <button data-fmt="html" role="radio" aria-checked="false">HTML</button>
                 <button data-fmt="txt" role="radio" aria-checked="false">TXT</button>
               </div>
+              <div class="btn-row primary-actions">
+                <button class="primary split" type="button" data-act="export-book" disabled>导出全文</button>
+                <button class="primary split secondary" type="button" data-act="export-notes" disabled>导出笔记</button>
+              </div>
               <fieldset class="notes-opts" aria-describedby="wrx-notes-help">
-                <legend>笔记与标注</legend>
-                <label class="check">
-                  <input type="checkbox" data-opt="includeNotes" id="wrx-include-notes">
-                  <span>附带我的划线与想法</span>
-                </label>
+                <legend>笔记选项</legend>
                 <label class="check">
                   <input type="checkbox" data-opt="includePopular" id="wrx-include-popular" aria-describedby="wrx-popular-help">
                   <span>附带热门划线（他人标注）</span>
                 </label>
-                <p class="hint" id="wrx-notes-help">笔记按章节分组附在本次导出文件末尾，不单独生成文件；热门划线可选。</p>
+                <p class="hint" id="wrx-notes-help">「导出笔记」独立下载一个《书名 · 笔记与标注》文件，按章节分组；与「导出全文」互不依赖。</p>
                 <p class="hint" id="wrx-popular-help">热门划线为公开内容，服务端固定返回前 20 条。</p>
               </fieldset>
-              <button class="primary" data-act="export-book" disabled>导出全文</button>
-              <button class="shelf-btn" data-act="export-shelf" disabled>导出全书架笔记（按书分组，可选）</button>
+              <button class="shelf-btn" type="button" data-act="export-shelf" disabled>导出全书架笔记（按书分组，可选）</button>
               <div class="progress" hidden>
                 <div class="bar"><i></i></div>
                 <div class="progress-text">准备中…</div>
@@ -605,6 +610,9 @@
           break;
         case 'export-book':
           if (handler.onExportBook) handler.onExportBook();
+          break;
+        case 'export-notes':
+          if (handler.onExportNotes) handler.onExportNotes();
           break;
         case 'export-shelf':
           if (handler.onExportShelfNotes) handler.onExportShelfNotes();
@@ -877,6 +885,7 @@
     setBusy(busy) {
       this.busy = !!busy;
       this._setDisabled('[data-act="export-book"]', this.busy);
+      this._setDisabled('[data-act="export-notes"]', this.busy || !this.shelfReady);
       this._setDisabled('[data-act="export-shelf"]', this.busy || !this.shelfReady);
       this._setDisabled('[data-act="copy-current"]', this.busy || !this.currentChapter);
       this._setDisabled('[data-act="save-current"]', this.busy || !this.currentChapter);
@@ -939,6 +948,7 @@
     /** 全书架笔记按钮是否可用（初始化完成后解锁）。 */
     setShelfReady(ready) {
       this.shelfReady = !!ready;
+      this._setDisabled('[data-act="export-notes"]', this.busy || !this.shelfReady);
       this._setDisabled('[data-act="export-shelf"]', this.busy || !this.shelfReady);
     }
 
@@ -972,16 +982,18 @@
 
       const meta = document.createElement('div');
       meta.className = 'result-meta';
-      meta.textContent =
-        label +
-        ' · 成功 ' +
-        (stats.ok || 0) +
-        ' ' + unit +
-        (stats.failed ? ' · 失败 ' + stats.failed + ' ' + unit : '') +
-        ' · 约 ' +
-        sizeKb +
-        ' KB' +
-        (result.filename ? ' · ' + result.filename : '');
+      meta.textContent = result.metaOverride
+        ? result.metaOverride + ' · 约 ' + sizeKb + ' KB' +
+          (result.filename ? ' · ' + result.filename : '')
+        : label +
+          ' · 成功 ' +
+          (stats.ok || 0) +
+          ' ' + unit +
+          (stats.failed ? ' · 失败 ' + stats.failed + ' ' + unit : '') +
+          ' · 约 ' +
+          sizeKb +
+          ' KB' +
+          (result.filename ? ' · ' + result.filename : '');
 
       const actions = document.createElement('div');
       actions.className = 'btn-row';
@@ -1094,7 +1106,6 @@
         maxAttempts: this.settings.maxAttempts,
         refreshEvery: this.settings.refreshEvery,
         frontMatter: this.settings.frontMatter,
-        includeNotes: this.settings.includeNotes,
         includePopular: this.settings.includePopular,
       };
     }
@@ -1125,13 +1136,10 @@
       this._syncNotesOptions();
     }
 
-    /** 热门划线依赖「附带笔记」：未启用笔记时禁用并给出提示。 */
+    /** 热门划线只作用于笔记类导出，导出全文时不受影响。 */
     _syncNotesOptions() {
       const popular = this.root.querySelector('#wrx-include-popular');
-      if (!popular) return;
-      popular.disabled = !this.settings.includeNotes;
-      const label = popular.closest('label');
-      if (label) label.title = this.settings.includeNotes ? '' : '请先勾选「附带我的划线与想法」';
+      if (popular) popular.disabled = false;
     }
 
     _setDisabled(selector, disabled) {

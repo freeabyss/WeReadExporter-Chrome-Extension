@@ -263,20 +263,10 @@
       const result = await exporter.exportBook({
         format: options.format,
         frontMatter: options.frontMatter,
-        includeNotes: options.includeNotes,
-        includePopular: options.includePopular && options.includeNotes,
         signal: currentController.signal,
         onProgress: (info) => {
           if (info.phase === 'fetch' && info.chapter) {
             ui.setChapterStatus(info.chapter.uid, 'loading', info.chapter.title);
-          } else if (info.phase === 'notes') {
-            ui.updateProgress({
-              index: info.total,
-              total: info.total,
-              ok: info.ok,
-              failed: info.failed,
-              label: '正在读取笔记与标注…',
-            });
           } else if (info.phase === 'progress') {
             ui.updateProgress(info);
           }
@@ -296,14 +286,6 @@
       const filename = buildFileName(exporter.book, options.format);
       const view = Object.assign({}, result, { filename: filename });
       ui.finishExport(view);
-
-      const noteWarnings = result.notes && result.notes.warnings ? result.notes.warnings.length : 0;
-      if (noteWarnings) {
-        ui.showNotice(
-          result.notes.warnings.join('\n'),
-          'warn'
-        );
-      }
 
       const failed = result.stats.failed || 0;
       if (failed) {
@@ -348,6 +330,86 @@
           }
         }
         ui.setRetryVisible(exporter.getFailures().length > 0);
+      }
+    } finally {
+      exporting = false;
+      taskBusy = false;
+      ui.setBusy(false);
+      client.setSignal(null);
+      currentController = null;
+    }
+  }
+
+  async function exportNotes() {
+    if (exporting) {
+      ui.toast('正在导出中…');
+      return;
+    }
+    if (!initialized) {
+      ui.toast(bootError ? '书籍信息尚未就绪：' + bootError : '正在读取书籍信息，请稍候…', 'error');
+      return;
+    }
+
+    exporting = true;
+    taskBusy = true;
+    currentController = new AbortController();
+    client.setSignal(currentController.signal);
+
+    const options = ui.getOptions();
+    ui.startExport(1, '准备读取笔记与标注…');
+    ui.setRetryVisible(false);
+
+    try {
+      const result = await exporter.exportNotes({
+        format: options.format,
+        frontMatter: options.frontMatter,
+        includePopular: options.includePopular,
+        signal: currentController.signal,
+        onProgress: (info) => {
+          if (info.phase === 'notes-start') {
+            ui.updateProgress({ index: 0, total: 1, ok: 0, failed: 0, label: '正在读取我的划线与想法…' });
+          } else if (info.phase === 'notes-progress') {
+            ui.updateProgress({ index: 1, total: 1, ok: 1, failed: 0, label: '正在整理笔记…' });
+          }
+        },
+      });
+
+      const filename = buildFileName(exporter.book, options.format, '笔记与标注');
+      const noteStats = result.stats.notes;
+      const metaOverride =
+        String(options.format).toUpperCase() + ' · 笔记与标注 · 我的划线 ' +
+        noteStats.highlights + ' 条 · 我的想法 ' + noteStats.thoughts + ' 条' +
+        (noteStats.popular ? ' · 热门划线 ' + noteStats.popular + ' 条' : '');
+      const view = Object.assign({}, result, { filename: filename, metaOverride: metaOverride });
+      ui.finishExport(view);
+
+      if (result.notes && result.notes.warnings && result.notes.warnings.length) {
+        ui.showNotice(result.notes.warnings.join('\n'), 'warn');
+      }
+
+      ui.toast(
+        '笔记导出完成：划线 ' + noteStats.highlights + ' 条 · 想法 ' + noteStats.thoughts + ' 条，' + filename,
+        'success',
+        4200
+      );
+
+      try {
+        downloadText(result.content, filename, options.format);
+      } catch (error) {
+        console.warn('[微信读书导出] 自动下载失败，请点击「下载文件」：', error);
+        ui.toast('自动下载被拦截，请点击结果里的「下载文件」', 'error', 5000);
+      }
+    } catch (error) {
+      ui.hideProgress();
+      ui.setBusy(false);
+      const code = error && error.code;
+      if (code === WRX.ErrorCode.ABORTED) {
+        ui.toast('已取消导出');
+      } else {
+        const message = (error && error.message) || String(error);
+        ui.showNotice('笔记导出失败：' + message, 'error', { retry: false });
+        ui.toast('笔记导出失败：' + message, 'error', 5200);
+        console.warn('[微信读书导出] 笔记导出失败：', error);
       }
     } finally {
       exporting = false;
@@ -585,6 +647,7 @@
         }
         exportBook();
       },
+      onExportNotes: () => exportNotes(),
       onExportShelfNotes: () => exportShelfNotes(),
       onCancel: () => cancelExport(),
       onJumpChapter: (uid) => jumpToChapter(uid),

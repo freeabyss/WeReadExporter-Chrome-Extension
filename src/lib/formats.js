@@ -604,6 +604,85 @@
     return parts.join('\n\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
   }
 
+  /**
+   * 单本书「笔记与标注」独立文档（与全文导出是两个不同功能、两个文件）。
+   * @param {{
+   *   format: 'md'|'html'|'txt',
+   *   book: {title?: string, author?: string},
+   *   notes: object,
+   *   options?: {frontMatter?: boolean, now?: Date}
+   * }} input
+   */
+  function buildNotesDocument(input) {
+    const format = input.format || 'md';
+    const book = input.book || {};
+    const notes = input.notes || WRX.notesUtils.buildEmptyNotes('', book.title || '');
+    const options = input.options || {};
+    const now = formatDate(options.now || new Date());
+    const includeFrontMatter = options.frontMatter !== false;
+    const title = (book.title || '微信读书') + ' · 笔记与标注';
+    const summary = notesSummary(notes);
+    const warnings = notes.warnings || [];
+
+    if (format === 'html') {
+      const warningHtml = warnings.map((w) =>
+        '<p class="notes-warning">⚠️ ' + escapeHtml(w) + '</p>'
+      );
+      return [
+        '<!DOCTYPE html>',
+        '<html lang="zh-CN">',
+        '<head>',
+        '<meta charset="utf-8">',
+        '<meta name="viewport" content="width=device-width, initial-scale=1">',
+        '<title>' + escapeHtml(title) + '</title>',
+        '<style>',
+        HTML_STYLE,
+        '</style>',
+        '</head>',
+        '<body>',
+        '<div class="wrap">',
+        includeFrontMatter
+          ? '<header><h1 class="book-title">' + escapeHtml(title) + '</h1>' +
+            '<p class="book-meta">' +
+            (book.author ? '作者：' + escapeHtml(book.author) + ' · ' : '') +
+            '导出自微信读书 · ' + escapeHtml(now) + '</p></header>'
+          : '',
+        '<section class="notes" id="notes">',
+        '<h2>笔记与标注</h2>',
+        renderNotesBody(notes, 'html', 2),
+        '</section>',
+        ...warningHtml,
+        '</div>',
+        '</body>',
+        '</html>',
+        '',
+      ].filter(Boolean).join('\n');
+    }
+
+    if (format === 'txt') {
+      const parts = [];
+      if (includeFrontMatter) {
+        parts.push([title, book.author ? '作者：' + book.author : '', '导出自微信读书 · ' + now, summary, '='.repeat(24)].filter(Boolean).join('\n'));
+      }
+      for (const warning of warnings) parts.push('⚠️ ' + warning);
+      parts.push(renderNotesBody(notes, 'txt', 2));
+      return parts.join('\n\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+    }
+
+    const parts = [];
+    if (includeFrontMatter) {
+      parts.push('# ' + title);
+      parts.push(
+        (book.author ? '> 作者：' + book.author + '\n' : '') +
+        '> 导出自微信读书 · ' + now + '\n> ' + summary
+      );
+      parts.push('---');
+    }
+    for (const warning of warnings) parts.push('> ⚠️ ' + warning);
+    parts.push(renderNotesBody(notes, 'md', 2));
+    return parts.join('\n\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+  }
+
   function buildBook(input) {
     const format = input.format || 'md';
     const book = input.book || {};
@@ -631,7 +710,6 @@
       now: now,
       stats: stats,
       chapters: chapters,
-      notes: input.notes || null,
       options: options,
     };
 
@@ -678,11 +756,6 @@
       if (body) parts.push(body);
     }
 
-    if (meta.notes) {
-      parts.push('---');
-      parts.push(buildNotesSection(meta.notes, 'md', { level: 2 }));
-    }
-
     return parts.join('\n\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
   }
 
@@ -711,10 +784,6 @@
       }
       parts.push('【' + chapter.title + '】');
       if (body) parts.push(body);
-    }
-
-    if (meta.notes) {
-      parts.push(buildNotesSection(meta.notes, 'txt', { level: 2 }));
     }
 
     return parts.join('\n\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
@@ -791,7 +860,6 @@
       headerHtml,
       tocHtml,
       ...sections,
-      meta.notes ? buildNotesSection(meta.notes, 'html', { level: 2 }) : '',
       '</div>',
       '</body>',
       '</html>',
@@ -822,6 +890,7 @@
     htmlToMarkdown,
     htmlToPlainText,
     buildBook,
+    buildNotesDocument,
     buildNotesSection,
     buildShelfNotes,
     renderNotesBody,

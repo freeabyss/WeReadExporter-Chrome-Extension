@@ -163,24 +163,40 @@ function sampleNotes() {
   };
 }
 
-test('buildBook：笔记附在同一文件末尾、不产生独立文件，按章节分组', () => {
+test('功能解耦：导出全文不含任何笔记内容', () => {
   const notes = sampleNotes();
   for (const format of ['md', 'html', 'txt']) {
     const content = WRX.formats.buildBook({
       format,
       book: { title: '笔记测试之书', author: '测试作者' },
       chapters: [{ uid: 1, title: '第1章', text: '正文内容。' }],
+      notes, // 即使误传也会被忽略
+    });
+    assert.ok(content.includes('正文内容。'), format + ' 正文仍在');
+    assert.equal(content.includes('笔记与标注'), false, format + ' 全文导出不含笔记小节');
+    assert.equal(content.includes('第一句划线原文'), false, format + ' 全文导出不含划线');
+    assert.equal(content.includes('对第一句的想法'), false, format + ' 全文导出不含想法');
+  }
+});
+
+test('buildNotesDocument：单本书笔记独立文件，按章节分组', () => {
+  const notes = sampleNotes();
+  for (const format of ['md', 'html', 'txt']) {
+    const content = WRX.formats.buildNotesDocument({
+      format,
+      book: { title: '笔记测试之书', author: '测试作者' },
       notes,
     });
 
-    assert.ok(content.includes('正文内容。'), format + ' 正文仍在');
-    assert.ok(content.includes('笔记与标注'), format + ' 含笔记小节');
+    assert.ok(content.includes('笔记测试之书'), format + ' 含书名');
+    assert.ok(content.includes('笔记与标注'), format + ' 含笔记标题');
     assert.ok(content.includes('第一句划线原文'), format + ' 含划线');
     assert.ok(content.includes('对第一句的想法'), format + ' 含关联想法');
     assert.ok(content.includes('一段独立的想法'), format + ' 含未关联想法');
     assert.ok(content.includes('很多人划的一句'), format + ' 含热门划线');
     assert.ok(content.includes('第1章') && content.includes('第2章'), format + ' 按章节分组');
     assert.ok(content.includes('划线接口部分数据不可用'), format + ' 显示 warning');
+    assert.ok(!content.includes('正文内容。'), format + ' 笔记文件不含正文');
   }
 });
 

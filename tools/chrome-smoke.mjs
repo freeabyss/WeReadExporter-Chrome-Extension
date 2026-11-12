@@ -379,14 +379,11 @@ async function main() {
     }
     assert(!content.includes('试读'), '导出内容不应包含试读标记');
 
-    // 笔记与标注：默认勾选「附带我的划线与想法」，应与正文同处一个文件
-    assert(content.includes('笔记与标注'), '下载文件应含「笔记与标注」小节');
-    assert(content.includes('真实浏览器第一句划线'), '含第一章划线原文');
-    assert(content.includes('真实浏览器第二句划线'), '含第二章划线原文');
-    assert(content.includes('对第一句划线的真实想法'), '含关联到划线的想法');
-    assert(content.includes('一条独立想法'), '含独立想法');
-    assert(!content.includes('真实浏览器热门划线'), '热门划线默认关闭');
-    log('笔记校验通过：同一文件内按章节分组，含 2 条划线 + 2 条想法');
+    // 功能解耦：全文导出不含任何笔记内容
+    assert(!content.includes('笔记与标注'), '全文导出不应含笔记小节');
+    assert(!content.includes('真实浏览器第一句划线'), '全文导出不应含划线');
+    assert(!content.includes('对第一句划线的真实想法'), '全文导出不应含想法');
+    log('功能解耦校验通过：全文导出只含正文');
 
     log('下载文件校验通过：' + expectedName + '（' + (content.length / 1024).toFixed(1) + ' KB）');
 
@@ -406,6 +403,33 @@ async function main() {
       assert(body.s === signRef(unsigned), '签名不正确：' + request.path);
     }
     log('接口参数校验通过：' + contentRequests.length + ' 个章节分片请求');
+
+    const notePathsBefore = mock.state.requests.map((request) => request.path);
+    assert(!notePathsBefore.some((p) => p.startsWith('/web/book/bookmarklist')), '全文导出不应请求划线接口');
+    assert(!notePathsBefore.some((p) => p.startsWith('/web/review/list/mine')), '全文导出不应请求想法接口');
+    log('全文导出未触发任何笔记接口');
+
+    // 独立功能：点「导出笔记」，应下载第二个、独立的文件
+    await evaluate(`(() => {
+      const root = document.getElementById('wrx-host').shadowRoot;
+      root.querySelector('[data-act="export-notes"]').click();
+      return true;
+    })()`);
+
+    const notesName = book.title + ' - 笔记与标注.md';
+    const notesPath = path.join(downloadDir, notesName);
+    const notesStats = await waitForFile(notesPath, 20000);
+    assert(notesStats, '没有找到独立笔记文件 ' + notesName + '，目录：' + (await fsp.readdir(downloadDir)).join(','));
+
+    const notesContent = await fsp.readFile(notesPath, 'utf8');
+    assert(notesContent.includes('笔记与标注'), '笔记文件含标题');
+    assert(notesContent.includes('真实浏览器第一句划线'), '含第一章划线原文');
+    assert(notesContent.includes('真实浏览器第二句划线'), '含第二章划线原文');
+    assert(notesContent.includes('对第一句划线的真实想法'), '含关联到划线的想法');
+    assert(notesContent.includes('一条独立想法'), '含独立想法');
+    assert(!notesContent.includes('【本章开头-1】'), '笔记文件不含正文');
+    assert(!notesContent.includes('真实浏览器热门划线'), '热门划线默认关闭');
+    log('独立笔记文件校验通过：按章节分组、含 2 条划线 + 2 条想法、不含正文');
 
     const notePaths = mock.state.requests.map((request) => request.path);
     assert(notePaths.some((p) => p.startsWith('/web/book/bookmarklist')), '应请求划线接口');

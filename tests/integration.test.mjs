@@ -396,7 +396,7 @@ test('章节列表：加载过的章节可直接复制（剪贴板内容为完�
 });
 
 
-// ------------------------------------------------------------------ 笔记与标注
+// ------------------------------------------------------------------ 笔记与标注（独立功能）
 
 function notesFixture() {
   return {
@@ -416,74 +416,103 @@ function notesFixture() {
   };
 }
 
-test('笔记：导出全文时按章节分组附带在同一文件里（不产生独立笔记文件）', async (t) => {
-  const book = {
+function makeNotesBook() {
+  return {
     bookId: '43208843',
     title: '山谷来信',
     author: '测试作者',
     format: 'epub',
     chapters: makeChapters(2, 'epub'),
   };
+}
 
-  const ctx = await setup({
-    book: book,
-    notes: notesFixture(),
-    settings: { includeNotes: true, includePopular: false },
-  });
+test('功能解耦：导出全文不含笔记，且不会请求任何笔记接口', async (t) => {
+  const ctx = await setup({ book: makeNotesBook(), notes: notesFixture() });
   t.after(() => ctx.dom.window.close());
 
   await bootAndWaitReady(ctx);
-
-  // 默认「附带我的划线与想法」为开，「热门划线」为关
-  const notesToggle = ctx.ui.root.querySelector('#wrx-include-notes');
-  const popularToggle = ctx.ui.root.querySelector('#wrx-include-popular');
-  assert.equal(notesToggle.checked, true);
-  assert.equal(popularToggle.checked, false);
-  assert.equal(popularToggle.disabled, false);
-
   click(ctx.window, ctx.ui.exportButton);
   await waitFor(() => !ctx.ui.resultEl.hidden, { label: '出现导出结果', timeout: 25000 });
 
-  assert.equal(ctx.window.__blobs.length, 1, '只能下载一个文件（正文 + 笔记在同一文件）');
+  assert.equal(ctx.window.__blobs.length, 1, '全文导出只产生一个文件');
   assert.equal(ctx.window.__downloads[0].filename, '山谷来信.md');
 
   const content = await readBlobText(ctx.window.__blobs[0]);
   assert.ok(content.includes('【本章结尾-2】'), '正文完整');
-  assert.ok(content.includes('笔记与标注'), '含笔记小节');
+  assert.equal(content.includes('笔记与标注'), false, '全文导出不含笔记小节');
+  assert.equal(content.includes('第一章的划线原文'), false, '全文导出不含划线');
+
+  const paths = ctx.mock.state.requests.map((r) => r.path);
+  assert.equal(paths.some((p) => p.startsWith('/web/book/bookmarklist')), false, '未请求划线接口');
+  assert.equal(paths.some((p) => p.startsWith('/web/review/list/mine')), false, '未请求想法接口');
+  assert.equal(paths.some((p) => p.startsWith('/web/book/bestbookmarks')), false, '未请求热门划线');
+});
+
+test('导出笔记：独立按钮产生独立文件，按章节分组，不抓正文', async (t) => {
+  const ctx = await setup({ book: makeNotesBook(), notes: notesFixture() });
+  t.after(() => ctx.dom.window.close());
+
+  await bootAndWaitReady(ctx);
+  const notesButton = ctx.ui.root.querySelector('[data-act="export-notes"]');
+  assert.ok(notesButton, '应有独立的「导出笔记」按钮');
+  assert.equal(notesButton.disabled, false, '初始化后可用');
+  assert.equal(ctx.ui.root.querySelector('#wrx-include-notes'), null, '不应再有「附带笔记」主开关');
+
+  click(ctx.window, notesButton);
+  await waitFor(() => !ctx.ui.resultEl.hidden, { label: '出现导出结果', timeout: 25000 });
+
+  assert.equal(ctx.window.__blobs.length, 1, '只产生一个笔记文件');
+  assert.equal(ctx.window.__downloads[0].filename, '山谷来信 - 笔记与标注.md');
+
+  const content = await readBlobText(ctx.window.__blobs[0]);
+  assert.ok(content.includes('笔记与标注'), '含笔记标题');
   assert.ok(content.includes('第一章的划线原文'), '含第一章划线');
   assert.ok(content.includes('第二章的划线原文'), '含第二章划线');
   assert.ok(content.includes('对第一章划线的想法'), '含关联想法');
   assert.ok(content.includes('独立的读书感想'), '含独立想法');
-  assert.ok(!content.includes('大家都划的一句'), '未勾选热门划线时不应包含');
+  assert.equal(content.includes('【本章开头-1】'), false, '笔记文件不含正文');
+  assert.equal(content.includes('大家都划的一句'), false, '未勾选热门划线时不含');
 
   assert.match(ctx.ui.resultEl.textContent, /笔记：我的划线 2 条 · 我的想法 2 条/);
 
   const paths = ctx.mock.state.requests.map((r) => r.path);
   assert.ok(paths.some((p) => p.startsWith('/web/book/bookmarklist')), '请求划线接口');
   assert.ok(paths.some((p) => p.startsWith('/web/review/list/mine')), '请求想法接口');
-  assert.ok(!paths.some((p) => p.startsWith('/web/book/bestbookmarks')), '未请求热门划线');
+  assert.equal(paths.some((p) => p.startsWith('/web/book/chapter/e_')), false, '导出笔记不抓正文分片');
 });
 
-test('笔记：热门划线为可选开关，勾选后才加入同一文件', async (t) => {
-  const book = {
-    bookId: '43208843',
-    title: '山谷来信',
-    author: '测试作者',
-    format: 'epub',
-    chapters: makeChapters(2, 'epub'),
-  };
+test('两个功能互不依赖：先导出笔记再导出全文，得到两个不同文件', async (t) => {
+  const ctx = await setup({ book: makeNotesBook(), notes: notesFixture() });
+  t.after(() => ctx.dom.window.close());
 
+  await bootAndWaitReady(ctx);
+
+  click(ctx.window, ctx.ui.root.querySelector('[data-act="export-notes"]'));
+  await waitFor(() => !ctx.ui.resultEl.hidden, { label: '笔记导出完成', timeout: 25000 });
+  click(ctx.window, ctx.ui.exportButton);
+  await waitFor(() => ctx.window.__blobs.length === 2, { label: '全文导出完成', timeout: 25000 });
+
+  assert.equal(ctx.window.__downloads[0].filename, '山谷来信 - 笔记与标注.md');
+  assert.equal(ctx.window.__downloads[1].filename, '山谷来信.md');
+
+  const notesContent = await readBlobText(ctx.window.__blobs[0]);
+  const bookContent = await readBlobText(ctx.window.__blobs[1]);
+  assert.ok(notesContent.includes('第一章的划线原文') && !notesContent.includes('【本章开头-1】'));
+  assert.ok(bookContent.includes('【本章开头-1】') && !bookContent.includes('笔记与标注'));
+});
+
+test('导出笔记：热门划线为可选开关，勾选后才加入笔记文件', async (t) => {
   const ctx = await setup({
-    book: book,
+    book: makeNotesBook(),
     notes: notesFixture(),
-    settings: { includeNotes: true, includePopular: true },
+    settings: { includePopular: true },
   });
   t.after(() => ctx.dom.window.close());
 
   await bootAndWaitReady(ctx);
   assert.equal(ctx.ui.root.querySelector('#wrx-include-popular').checked, true);
 
-  click(ctx.window, ctx.ui.exportButton);
+  click(ctx.window, ctx.ui.root.querySelector('[data-act="export-notes"]'));
   await waitFor(() => !ctx.ui.resultEl.hidden, { label: '出现导出结果', timeout: 25000 });
 
   const content = await readBlobText(ctx.window.__blobs[0]);
@@ -492,51 +521,32 @@ test('笔记：热门划线为可选开关，勾选后才加入同一文件', as
   assert.match(ctx.ui.resultEl.textContent, /热门划线 1 条/);
 });
 
-test('笔记：关闭开关后导出内容完全不含笔记小节', async (t) => {
-  const book = {
-    bookId: '43208843',
-    title: '山谷来信',
-    author: '测试作者',
-    format: 'epub',
-    chapters: makeChapters(2, 'epub'),
-  };
-
+test('导出笔记：接口不可用时笔记文件明确提示，全文导出不受影响', async (t) => {
   const ctx = await setup({
-    book: book,
-    notes: notesFixture(),
-    settings: { includeNotes: false },
+    book: makeNotesBook(),
+    notes: { disableNotes: true, disableReviews: true, disablePopular: true },
   });
   t.after(() => ctx.dom.window.close());
 
   await bootAndWaitReady(ctx);
-  assert.equal(ctx.ui.root.querySelector('#wrx-include-popular').disabled, true, '主开关关闭时热门划线禁用');
 
-  click(ctx.window, ctx.ui.exportButton);
+  click(ctx.window, ctx.ui.root.querySelector('[data-act="export-notes"]'));
   await waitFor(() => !ctx.ui.resultEl.hidden, { label: '出现导出结果', timeout: 25000 });
 
-  const content = await readBlobText(ctx.window.__blobs[0]);
-  assert.ok(!content.includes('笔记与标注'));
-  assert.ok(!content.includes('第一章的划线原文'));
-  assert.equal(
-    ctx.mock.state.requests.filter((r) => r.path.startsWith('/web/book/bookmarklist')).length,
-    0
-  );
+  const notesContent = await readBlobText(ctx.window.__blobs[0]);
+  assert.ok(notesContent.includes('划线接口不可用'), '笔记文件内明确提示');
+  assert.ok(notesContent.includes('个人想法接口不可用'), '笔记文件内明确提示');
+  assert.match(ctx.ui.resultEl.textContent, /导出完成/);
+
+  click(ctx.window, ctx.ui.exportButton);
+  await waitFor(() => ctx.window.__blobs.length === 2, { label: '全文导出完成', timeout: 25000 });
+  const bookContent = await readBlobText(ctx.window.__blobs[1]);
+  assert.ok(bookContent.includes('【本章结尾-2】'), '正文仍完整导出');
+  assert.equal(bookContent.includes('划线接口不可用'), false, '正文文件不受笔记接口影响');
 });
 
 test('笔记：全书架批量导出生成一个文件、按书分组', async (t) => {
-  const book = {
-    bookId: '43208843',
-    title: '山谷来信',
-    author: '测试作者',
-    format: 'epub',
-    chapters: makeChapters(2, 'epub'),
-  };
-
-  const ctx = await setup({
-    book: book,
-    notes: notesFixture(),
-    settings: { includeNotes: true },
-  });
+  const ctx = await setup({ book: makeNotesBook(), notes: notesFixture() });
   t.after(() => ctx.dom.window.close());
 
   await bootAndWaitReady(ctx);
@@ -555,31 +565,4 @@ test('笔记：全书架批量导出生成一个文件、按书分组', async (t
   assert.ok(content.includes('山谷来信'), '第一本书分组');
   assert.ok(content.includes('第二本书'), '第二本书分组');
   assert.ok(content.includes('第一章的划线原文'), '含笔记内容');
-});
-
-test('笔记：接口不可用时显示明确提示，正文导出不受影响', async (t) => {
-  const book = {
-    bookId: '43208843',
-    title: '山谷来信',
-    author: '测试作者',
-    format: 'epub',
-    chapters: makeChapters(2, 'epub'),
-  };
-
-  const ctx = await setup({
-    book: book,
-    notes: { disableNotes: true, disableReviews: true, disablePopular: true },
-    settings: { includeNotes: true },
-  });
-  t.after(() => ctx.dom.window.close());
-
-  await bootAndWaitReady(ctx);
-  click(ctx.window, ctx.ui.exportButton);
-  await waitFor(() => !ctx.ui.resultEl.hidden, { label: '出现导出结果', timeout: 25000 });
-
-  const content = await readBlobText(ctx.window.__blobs[0]);
-  assert.ok(content.includes('【本章结尾-2】'), '正文仍完整导出');
-  assert.ok(content.includes('划线接口不可用'), '文件内明确提示');
-  assert.ok(content.includes('个人想法接口不可用'), '文件内明确提示');
-  assert.match(ctx.ui.resultEl.textContent, /导出完成/);
 });

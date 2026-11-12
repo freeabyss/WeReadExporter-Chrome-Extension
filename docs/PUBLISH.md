@@ -26,7 +26,7 @@
 
 ```bash
 npm run package -- --store
-# → dist/weread-exporter-store-v1.1.0.zip
+# → dist/weread-exporter-store-v1.2.0.zip
 ```
 
 商店包**只包含运行时文件**（`manifest.json` 在 zip 根目录、`src/`、`icons/`），不含 docs/测试/README，符合商店对包体的要求。
@@ -76,7 +76,7 @@ https://github.com/freeabyss/WeReadExporter-Chrome-Extension/blob/main/PRIVACY.m
 
 ## 3. 新建商品并上传包
 
-1. Dashboard → **「Add new item / 新增商品」** → 上传 `dist/weread-exporter-store-v1.1.0.zip`。
+1. Dashboard → **「Add new item / 新增商品」** → 上传 `dist/weread-exporter-store-v1.2.0.zip`。
 2. 上传成功后会进入编辑页，左侧有 4 个标签：**商品信息 / 隐私权 / 分发 / 测试说明**。
 3. 上传前 Google 会自动做一次静态检查（Manifest 合法性、远程代码、混淆等）。本扩展是 **Manifest V3**、所有依赖本地打包（无 CDN 远程代码）、只申请 `clipboardWrite` 与 `weread.qq.com` 主机访问，通常能顺利通过。
 

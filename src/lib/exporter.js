@@ -311,8 +311,6 @@
      *   signal?: AbortSignal,
      *   onProgress?: Function,
      *   frontMatter?: boolean,
-     *   includeNotes?: boolean,
-     *   includePopular?: boolean,
      *   chapters?: object[]
      * }} [options]
      */
@@ -413,40 +411,21 @@
         }
       }
 
-      let notes = null;
-      if (opts.includeNotes) {
-        throwIfAborted(signal);
-        onProgress({ phase: 'notes', total: total, ok: ok, failed: failed });
-        notes = await this.collectNotes({ includePopular: !!opts.includePopular });
-        if (notes.warnings && notes.warnings.length) lastWarnings += notes.warnings.length;
-      }
-
       const content = WRX.formats.buildBook({
         format: format,
         book: this.book || {},
         chapters: items,
-        notes: notes,
         options: {
           frontMatter: opts.frontMatter !== false,
           toc: true,
         },
       });
 
-      const noteStats = notes
-        ? {
-            highlights: notes.stats.highlights,
-            thoughts: notes.stats.thoughts,
-            popular: notes.stats.popular,
-            warnings: notes.warnings.length,
-          }
-        : null;
-
       const result = {
         format: format,
         content: content,
         book: this.book,
         chapters: items,
-        notes: notes,
         stats: {
           total: total,
           ok: ok,
@@ -454,11 +433,70 @@
           warnings: lastWarnings,
           chars: WRX.formats.countChars(content),
           cached: this.cachedCount,
-          notes: noteStats,
         },
       };
 
       onProgress({ phase: 'done', total: total, ok: ok, failed: failed, result: result });
+      return result;
+    }
+
+    /**
+     * 导出当前书籍的笔记与标注（独立功能，只抓笔记，不抓正文）。
+     * @param {{
+     *   format?: 'md'|'html'|'txt',
+     *   signal?: AbortSignal,
+     *   onProgress?: Function,
+     *   includePopular?: boolean,
+     *   frontMatter?: boolean,
+     *   force?: boolean
+     * }} [options]
+     */
+    async exportNotes(options) {
+      const opts = options || {};
+      const format = opts.format || 'md';
+      const signal = opts.signal;
+      const onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : function () {};
+
+      throwIfAborted(signal);
+      onProgress({ phase: 'notes-start', total: 1, ok: 0, failed: 0 });
+
+      const notes = await this.collectNotes({
+        includePopular: !!opts.includePopular,
+        force: !!opts.force,
+      });
+
+      onProgress({ phase: 'notes-progress', total: 1, index: 1, ok: 1, failed: 0 });
+
+      const content = WRX.formats.buildNotesDocument({
+        format: format,
+        book: this.book || {},
+        notes: notes,
+        options: { frontMatter: opts.frontMatter !== false },
+      });
+
+      const result = {
+        format: format,
+        content: content,
+        book: this.book,
+        notes: notes,
+        chapters: [],
+        stats: {
+          total: 1,
+          ok: 1,
+          failed: 0,
+          warnings: notes.warnings.length,
+          chars: WRX.formats.countChars(content),
+          cached: 0,
+          notes: {
+            highlights: notes.stats.highlights,
+            thoughts: notes.stats.thoughts,
+            popular: notes.stats.popular,
+            warnings: notes.warnings.length,
+          },
+        },
+      };
+
+      onProgress({ phase: 'done', total: 1, ok: 1, failed: 0, result: result });
       return result;
     }
 
