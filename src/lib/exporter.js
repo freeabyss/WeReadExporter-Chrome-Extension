@@ -77,6 +77,8 @@
       this.chapters = [];
       this.detectedFormat = null;
       this.lastCatalogAt = 0;
+      this.notesService = null;
+      this.notesCache = new Map();
     }
 
     /** 缓存 key 带上 bookId，切换书籍时不会串内容。 */
@@ -263,6 +265,45 @@
       throw Object.assign(lastError || new Error(failure.error), { chapter: chapter });
     }
 
+    /** 懒加载笔记服务（weread-notes.js 通过 manifest 先于本文件注入）。 */
+    getNotesService() {
+      if (!this.notesService) {
+        if (!WRX.WereadNotes) {
+          throw new WRX.WeReadError(C.FORMAT, '笔记模块未加载，请重新加载扩展。', {
+            retryable: false,
+          });
+        }
+        this.notesService = new WRX.WereadNotes(this.client);
+      }
+      return this.notesService;
+    }
+
+    /**
+     * 抓取当前书籍的笔记（带缓存，失败不抛异常，转为 warnings）。
+     * @param {{includePopular?: boolean, force?: boolean}} [options]
+     * @returns {Promise<object>}
+     */
+    async collectNotes(options) {
+      const opts = options || {};
+      const bookId = (this.book && this.book.bookId) || (this.client && this.client.bookId) || '';
+      const key = bookId + ':' + (opts.includePopular ? 'popular' : 'mine');
+      if (!opts.force && this.notesCache.has(key)) return this.notesCache.get(key);
+
+      let notes;
+      try {
+        notes = await this.getNotesService().collectBookNotes(bookId, {
+          includePopular: !!opts.includePopular,
+          catalogChapters: this.chapters,
+          bookTitle: (this.book && this.book.title) || '',
+        });
+      } catch (error) {
+        notes = WRX.notesUtils.buildEmptyNotes(bookId, (this.book && this.book.title) || '');
+        notes.warnings.push('笔记抓取失败：' + ((error && error.message) || '未知错误'));
+      }
+      this.notesCache.set(key, notes);
+      return notes;
+    }
+
     /**
      * 导出整本书。
      * @param {{
@@ -270,6 +311,8 @@
      *   signal?: AbortSignal,
      *   onProgress?: Function,
      *   frontMatter?: boolean,
+     *   includeNotes?: boolean,
+     *   includePopular?: boolean,
      *   chapters?: object[]
      * }} [options]
      */
@@ -370,21 +413,40 @@
         }
       }
 
+      let notes = null;
+      if (opts.includeNotes) {
+        throwIfAborted(signal);
+        onProgress({ phase: 'notes', total: total, ok: ok, failed: failed });
+        notes = await this.collectNotes({ includePopular: !!opts.includePopular });
+        if (notes.warnings && notes.warnings.length) lastWarnings += notes.warnings.length;
+      }
+
       const content = WRX.formats.buildBook({
         format: format,
         book: this.book || {},
         chapters: items,
+        notes: notes,
         options: {
           frontMatter: opts.frontMatter !== false,
           toc: true,
         },
       });
 
+      const noteStats = notes
+        ? {
+            highlights: notes.stats.highlights,
+            thoughts: notes.stats.thoughts,
+            popular: notes.stats.popular,
+            warnings: notes.warnings.length,
+          }
+        : null;
+
       const result = {
         format: format,
         content: content,
         book: this.book,
         chapters: items,
+        notes: notes,
         stats: {
           total: total,
           ok: ok,
@@ -392,6 +454,122 @@
           warnings: lastWarnings,
           chars: WRX.formats.countChars(content),
           cached: this.cachedCount,
+          notes: noteStats,
+        },
+      };
+
+      onProgress({ phase: 'done', total: total, ok: ok, failed: failed, result: result });
+      return result;
+    }
+
+    /**
+     * 全书架批量导出笔记：一个文件，按书分组（一个书本一组），不产生多个文件。
+     * @param {{
+     *   format?: 'md'|'html'|'txt',
+     *   signal?: AbortSignal,
+     *   onProgress?: Function,
+     *   includePopular?: boolean,
+     *   maxBooks?: number,
+     *   frontMatter?: boolean
+     * }} [options]
+     */
+    async exportShelfNotes(options) {
+      const opts = options || {};
+      const format = opts.format || 'md';
+      const signal = opts.signal;
+      const onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : function () {};
+      const service = this.getNotesService();
+      const warnings = [];
+
+      throwIfAborted(signal);
+      onProgress({ phase: 'shelf-start', total: 0, ok: 0, failed: 0 });
+
+      const listing = await service.fetchNotebookBooks();
+      if (!listing.ok || !listing.books.length) {
+        throw new WRX.WeReadError(
+          C.STATE,
+          '读取书架/笔记本失败：请确认已登录微信读书，且账号下有带笔记的书籍。',
+          { retryable: false }
+        );
+      }
+      if (listing.source === 'shelf') {
+        warnings.push('笔记本概览接口不可用，已回退到书架列表（无法预知哪些书有笔记）。');
+      }
+
+      const books = listing.books
+        .filter((book) => book.bookId && !String(book.bookId).startsWith('MP_WXS_'))
+        .slice(0, opts.maxBooks || 200);
+      const total = books.length;
+      const collected = [];
+      let ok = 0;
+      let failed = 0;
+
+      for (let i = 0; i < books.length; i++) {
+        throwIfAborted(signal);
+        const book = books[i];
+
+        onProgress({
+          phase: 'shelf-fetch',
+          index: i + 1,
+          total: total,
+          ok: ok,
+          failed: failed,
+          title: book.title,
+        });
+
+        try {
+          const notes = await service.collectBookNotes(book.bookId, {
+            includePopular: !!opts.includePopular,
+            bookTitle: book.title,
+          });
+          if (notes.warnings.length) {
+            warnings.push(book.title + '：' + notes.warnings.join('；'));
+          }
+          collected.push({ title: book.title, author: book.author, bookId: book.bookId, notes: notes });
+          ok += 1;
+        } catch (error) {
+          failed += 1;
+          warnings.push(book.title + '：抓取失败（' + ((error && error.message) || '未知错误') + '）');
+        }
+
+        onProgress({
+          phase: 'shelf-progress',
+          index: i + 1,
+          total: total,
+          ok: ok,
+          failed: failed,
+          title: book.title,
+        });
+      }
+
+      // 没有笔记的书也保留分组，但标注为空，避免用户以为漏了书。
+      const content = WRX.formats.buildShelfNotes({
+        format: format,
+        books: collected,
+        options: {
+          frontMatter: opts.frontMatter !== false,
+          warnings: warnings.slice(0, 30),
+        },
+      });
+
+      const result = {
+        format: format,
+        content: content,
+        book: { title: '微信读书 · 笔记合集', author: '' },
+        chapters: [],
+        stats: {
+          total: total,
+          ok: ok,
+          failed: failed,
+          warnings: warnings.length,
+          chars: WRX.formats.countChars(content),
+          cached: 0,
+          notes: {
+            highlights: collected.reduce((n, b) => n + b.notes.stats.highlights, 0),
+            thoughts: collected.reduce((n, b) => n + b.notes.stats.thoughts, 0),
+            popular: collected.reduce((n, b) => n + b.notes.stats.popular, 0),
+            warnings: warnings.length,
+          },
         },
       };
 

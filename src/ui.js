@@ -21,6 +21,8 @@
     maxAttempts: 3,
     refreshEvery: 40,
     frontMatter: true,
+    includeNotes: true,
+    includePopular: false,
   };
 
   const STATUS_TEXT = {
@@ -264,6 +266,39 @@
     .toast.error { background: rgba(185, 28, 28, .95); }
     .toast.success { background: rgba(21, 128, 61, .95); }
 
+    /* 笔记与标注选项：原生 checkbox + fieldset/legend，保留键盘与辅助技术支持 */
+    fieldset.notes-opts {
+      margin: 10px 0 0; padding: 8px 10px 10px;
+      border: 1px solid var(--wrx-border); border-radius: 10px;
+      min-width: 0;
+    }
+    fieldset.notes-opts legend {
+      padding: 0 5px; font-size: 11px; font-weight: 600;
+      letter-spacing: .4px; color: var(--wrx-muted);
+    }
+    fieldset.notes-opts label.check {
+      display: flex; align-items: center; gap: 8px;
+      min-height: 32px; font-size: 12px; color: var(--wrx-text);
+      cursor: pointer;
+    }
+    fieldset.notes-opts input[type="checkbox"] {
+      flex: 0 0 auto; width: 15px; height: 15px; margin: 0;
+      accent-color: var(--wrx-primary); cursor: pointer;
+    }
+    fieldset.notes-opts input[type="checkbox"]:disabled { cursor: not-allowed; opacity: .5; }
+    fieldset.notes-opts input[type="checkbox"]:focus-visible {
+      outline: 2px solid var(--wrx-primary); outline-offset: 2px;
+    }
+    fieldset.notes-opts .hint { margin: 4px 0 0; font-size: 10.5px; line-height: 1.5; color: var(--wrx-muted); }
+    button.shelf-btn {
+      width: 100%; margin-top: 7px; padding: 7px 10px;
+      border-radius: 9px; border: 1px dashed var(--wrx-border);
+      background: transparent; color: var(--wrx-muted); font-size: 12px;
+    }
+    button.shelf-btn:hover:not(:disabled) { color: var(--wrx-primary); border-color: rgba(47,107,255,.5); background: rgba(47,107,255,.04); }
+    button.shelf-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .result-notes { margin-top: 3px; font-size: 11px; color: var(--wrx-primary); }
+
     .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
     @media (prefers-color-scheme: dark) {
@@ -311,6 +346,8 @@
     settings.maxAttempts = clamp(Number(settings.maxAttempts) || 3, 1, 5);
     settings.refreshEvery = clamp(Number(settings.refreshEvery) || 0, 0, 500);
     settings.frontMatter = settings.frontMatter !== false;
+    settings.includeNotes = settings.includeNotes !== false;
+    settings.includePopular = settings.includePopular === true;
     return settings;
   }
 
@@ -339,6 +376,7 @@
       this.busy = false;
       this.result = null;
       this.mounted = false;
+      this.shelfReady = false;
       this._toastTimer = null;
       this._lastFocus = null;
     }
@@ -390,6 +428,7 @@
       this._enableDrag(this.panel, host.querySelector('.panel-head'), STORAGE_KEYS.panelPos);
       this._syncFormatButtons();
       this._syncOptionInputs();
+      this._syncNotesOptions();
       this._setPanelOpen(false);
     }
 
@@ -442,7 +481,21 @@
                 <button data-fmt="html" role="radio" aria-checked="false">HTML</button>
                 <button data-fmt="txt" role="radio" aria-checked="false">TXT</button>
               </div>
+              <fieldset class="notes-opts" aria-describedby="wrx-notes-help">
+                <legend>笔记与标注</legend>
+                <label class="check">
+                  <input type="checkbox" data-opt="includeNotes" id="wrx-include-notes">
+                  <span>附带我的划线与想法</span>
+                </label>
+                <label class="check">
+                  <input type="checkbox" data-opt="includePopular" id="wrx-include-popular" aria-describedby="wrx-popular-help">
+                  <span>附带热门划线（他人标注）</span>
+                </label>
+                <p class="hint" id="wrx-notes-help">笔记按章节分组附在本次导出文件末尾，不单独生成文件；热门划线可选。</p>
+                <p class="hint" id="wrx-popular-help">热门划线为公开内容，服务端固定返回前 20 条。</p>
+              </fieldset>
               <button class="primary" data-act="export-book" disabled>导出全文</button>
+              <button class="shelf-btn" data-act="export-shelf" disabled>导出全书架笔记（按书分组，可选）</button>
               <div class="progress" hidden>
                 <div class="bar"><i></i></div>
                 <div class="progress-text">准备中…</div>
@@ -527,6 +580,7 @@
           );
         }
         writeStorage(STORAGE_KEYS.settings, this.settings);
+        this._syncNotesOptions();
         if (typeof this.handlers.onSettingsChange === 'function') {
           this.handlers.onSettingsChange(this.getOptions());
         }
@@ -551,6 +605,9 @@
           break;
         case 'export-book':
           if (handler.onExportBook) handler.onExportBook();
+          break;
+        case 'export-shelf':
+          if (handler.onExportShelfNotes) handler.onExportShelfNotes();
           break;
         case 'cancel':
           if (handler.onCancel) handler.onCancel();
@@ -820,6 +877,7 @@
     setBusy(busy) {
       this.busy = !!busy;
       this._setDisabled('[data-act="export-book"]', this.busy);
+      this._setDisabled('[data-act="export-shelf"]', this.busy || !this.shelfReady);
       this._setDisabled('[data-act="copy-current"]', this.busy || !this.currentChapter);
       this._setDisabled('[data-act="save-current"]', this.busy || !this.currentChapter);
       this._setDisabled('[data-act="retry-failed"]', this.busy);
@@ -834,14 +892,14 @@
       if (cancelButton) cancelButton.disabled = !busy;
     }
 
-    startExport(total) {
+    startExport(total, label) {
       this.clearNotice();
       this.resultEl.hidden = true;
       this.resultEl.innerHTML = '';
       this.result = null;
       this.setBusy(true);
       this.progressEl.hidden = false;
-      this._setProgress(0, '准备抓取目录…（共 ' + total + ' 章）');
+      this._setProgress(0, label || '准备抓取目录…（共 ' + total + ' 章）');
     }
 
     updateProgress(info) {
@@ -851,10 +909,10 @@
 
       const chapterTitle = info.chapter ? '：' + info.chapter.title : '';
       const failedText = info.failed ? '，失败 ' + info.failed : '';
-      this._setProgress(
-        percent,
-        '正在获取 ' + index + '/' + total + '（' + percent + '%）' + chapterTitle + failedText
-      );
+      const text = info.label
+        ? info.label + '（' + index + '/' + total + '，' + percent + '%）' + failedText
+        : '正在获取 ' + index + '/' + total + '（' + percent + '%）' + chapterTitle + failedText;
+      this._setProgress(percent, text);
     }
 
     finishExport(result) {
@@ -876,6 +934,12 @@
         this.resultEl.innerHTML = '';
       }
       this.hideProgress();
+    }
+
+    /** 全书架笔记按钮是否可用（初始化完成后解锁）。 */
+    setShelfReady(ready) {
+      this.shelfReady = !!ready;
+      this._setDisabled('[data-act="export-shelf"]', this.busy || !this.shelfReady);
     }
 
     /** 显示/隐藏「重试失败」按钮。 */
@@ -900,6 +964,7 @@
       const failed = failedList.filter((c) => c && c.title);
       const sizeKb = Math.max(1, Math.round((result.content || '').length / 1024));
       const label = String(result.format || 'md').toUpperCase();
+      const unit = result.unit || '章';
 
       const head = document.createElement('div');
       head.className = 'result-head';
@@ -911,8 +976,8 @@
         label +
         ' · 成功 ' +
         (stats.ok || 0) +
-        ' 章' +
-        (stats.failed ? ' · 失败 ' + stats.failed + ' 章' : '') +
+        ' ' + unit +
+        (stats.failed ? ' · 失败 ' + stats.failed + ' ' + unit : '') +
         ' · 约 ' +
         sizeKb +
         ' KB' +
@@ -935,9 +1000,21 @@
       actions.appendChild(saveButton);
       actions.appendChild(copyButton);
 
+      const noteStats = result.stats && result.stats.notes;
+      const notesLine = document.createElement('div');
+      if (noteStats) {
+        notesLine.className = 'result-notes';
+        notesLine.textContent =
+          '笔记：我的划线 ' + (noteStats.highlights || 0) + ' 条 · 我的想法 ' +
+          (noteStats.thoughts || 0) + ' 条' +
+          (noteStats.popular ? ' · 热门划线 ' + noteStats.popular + ' 条' : '') +
+          (noteStats.warnings ? ' · 提示 ' + noteStats.warnings + ' 条' : '');
+      }
+
       this.resultEl.innerHTML = '';
       this.resultEl.appendChild(head);
       this.resultEl.appendChild(meta);
+      if (noteStats) this.resultEl.appendChild(notesLine);
       this.resultEl.appendChild(actions);
 
       if (failed.length) {
@@ -1017,6 +1094,8 @@
         maxAttempts: this.settings.maxAttempts,
         refreshEvery: this.settings.refreshEvery,
         frontMatter: this.settings.frontMatter,
+        includeNotes: this.settings.includeNotes,
+        includePopular: this.settings.includePopular,
       };
     }
 
@@ -1043,6 +1122,16 @@
         if (input.type === 'checkbox') input.checked = !!this.settings[key];
         else input.value = this.settings[key];
       });
+      this._syncNotesOptions();
+    }
+
+    /** 热门划线依赖「附带笔记」：未启用笔记时禁用并给出提示。 */
+    _syncNotesOptions() {
+      const popular = this.root.querySelector('#wrx-include-popular');
+      if (!popular) return;
+      popular.disabled = !this.settings.includeNotes;
+      const label = popular.closest('label');
+      if (label) label.title = this.settings.includeNotes ? '' : '请先勾选「附带我的划线与想法」';
     }
 
     _setDisabled(selector, disabled) {

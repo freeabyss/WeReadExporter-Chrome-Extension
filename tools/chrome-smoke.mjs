@@ -76,6 +76,21 @@ const book = {
   chapters: makeChapters(3),
 };
 
+const NOTES = {
+  highlights: [
+    { chapterUid: 1, markText: '真实浏览器第一句划线', range: '10-20', createTime: 1765000000 },
+    { chapterUid: 2, markText: '真实浏览器第二句划线', range: '30-40', createTime: 1765000100 },
+  ],
+  reviews: [
+    { content: '对第一句划线的真实想法', range: '10-20', abstract: '真实浏览器第一句划线', chapterUid: 1 },
+    { content: '一条独立想法', chapterUid: 2 },
+  ],
+  popular: [{ chapterUid: 1, markText: '真实浏览器热门划线', totalCount: 66 }],
+  notebooks: [
+    { bookId: '43208843', title: '真实浏览器之书', author: '冒烟测试', noteCount: 2, reviewCount: 2 },
+  ],
+};
+
 // ---------------------------------------------------------------- 扩展副本
 
 async function prepareExtension() {
@@ -93,7 +108,7 @@ async function prepareExtension() {
 // ---------------------------------------------------------------- 本地服务
 
 function startServer() {
-  const mock = createMockWeread({ book: book, pagePsvts: 'pspage0001' });
+  const mock = createMockWeread({ book: book, pagePsvts: 'pspage0001', notes: NOTES });
 
   const server = http.createServer(async (req, res) => {
     try {
@@ -110,7 +125,7 @@ function startServer() {
         }
       }
 
-      const result = await mock.handle({ path: url.pathname, method: req.method, body });
+      const result = await mock.handle({ path: url.pathname + url.search, method: req.method, body });
       if (url.pathname === '/favicon.ico') {
         res.writeHead(204).end();
         return;
@@ -363,6 +378,16 @@ async function main() {
       );
     }
     assert(!content.includes('试读'), '导出内容不应包含试读标记');
+
+    // 笔记与标注：默认勾选「附带我的划线与想法」，应与正文同处一个文件
+    assert(content.includes('笔记与标注'), '下载文件应含「笔记与标注」小节');
+    assert(content.includes('真实浏览器第一句划线'), '含第一章划线原文');
+    assert(content.includes('真实浏览器第二句划线'), '含第二章划线原文');
+    assert(content.includes('对第一句划线的真实想法'), '含关联到划线的想法');
+    assert(content.includes('一条独立想法'), '含独立想法');
+    assert(!content.includes('真实浏览器热门划线'), '热门划线默认关闭');
+    log('笔记校验通过：同一文件内按章节分组，含 2 条划线 + 2 条想法');
+
     log('下载文件校验通过：' + expectedName + '（' + (content.length / 1024).toFixed(1) + ' KB）');
 
     // 校验接口参数：sc=1 + 签名正确
@@ -381,6 +406,12 @@ async function main() {
       assert(body.s === signRef(unsigned), '签名不正确：' + request.path);
     }
     log('接口参数校验通过：' + contentRequests.length + ' 个章节分片请求');
+
+    const notePaths = mock.state.requests.map((request) => request.path);
+    assert(notePaths.some((p) => p.startsWith('/web/book/bookmarklist')), '应请求划线接口');
+    assert(notePaths.some((p) => p.startsWith('/web/review/list/mine')), '应请求想法接口');
+    assert(!notePaths.some((p) => p.startsWith('/web/book/bestbookmarks')), '未勾选时不应请求热门划线');
+    log('笔记接口校验通过：划线 + 想法，未请求热门划线');
 
     // 复制章节：导出过程是异步的，此时已经没有用户手势，
     // 必须确认剪贴板兜底方案能正常工作。

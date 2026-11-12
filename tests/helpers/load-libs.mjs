@@ -17,6 +17,7 @@ export const LIB_FILES = [
   'src/lib/weread-decode.js',
   'src/lib/weread-state.js',
   'src/lib/weread-api.js',
+  'src/lib/weread-notes.js',
   'src/lib/formats.js',
   'src/lib/exporter.js',
 ];

@@ -13,3 +13,6 @@ Thumbs.db
 .idea/
 .vscode/
 *.log
+
+# 其他任务留下的临时产物
+.tmp-uninstall/

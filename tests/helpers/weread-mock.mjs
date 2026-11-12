@@ -130,6 +130,11 @@ export function makeEpubChapterHtml(title, paragraphs) {
   );
 }
 
+/** handle 会把 query 单独存到 request.query，这里取出来供 URLSearchParams 解析。 */
+function pathWithQuery(request) {
+  return request.query || '';
+}
+
 /**
  * 构造一个微信读书接口模拟器。
  * @param {{
@@ -137,11 +142,21 @@ export function makeEpubChapterHtml(title, paragraphs) {
  *          chapters: Array<{uid: number, title: string, wordCount: number, text: string, html?: string}>},
  *   pagePsvts?: string,
  *   freshPsvts?: string,
- *   truncateChapter?: number
+ *   truncateChapter?: number,
+ *   notes?: {
+ *     highlights?: Array<{chapterUid: number, markText: string, range?: string, createTime?: number}>,
+ *     reviews?: Array<{content: string, abstract?: string, range?: string, chapterUid?: number, chapterName?: string, createTime?: number}>,
+ *     popular?: Array<{chapterUid: number, markText: string, totalCount?: number, range?: string}>,
+ *     notebooks?: Array<{bookId: string, title: string, author?: string, noteCount?: number, reviewCount?: number, sort?: number}>,
+ *     disableNotes?: boolean,
+ *     disableReviews?: boolean,
+ *     disablePopular?: boolean
+ *   }
  * }} options
  */
 export function createMockWeread(options) {
   const book = options.book;
+  const notesData = options.notes || null;
   // 服务端接受的 psvts：显式给出 freshPsvts 时用它（页面上的是过期值），否则与页面一致。
   const acceptedPsvts = options.freshPsvts || options.pagePsvts || 'pspage0001';
   const state = {
@@ -188,7 +203,11 @@ export function createMockWeread(options) {
    * @param {{path: string, method?: string, body?: object|null}} request
    */
   async function handle(request) {
-    const path = request.path;
+    // 兼容 path 里直接带 query 的调用方式
+    const rawPath = request.path || '';
+    const qIndex = rawPath.indexOf('?');
+    const path = qIndex === -1 ? rawPath : rawPath.slice(0, qIndex);
+    request.query = qIndex === -1 ? (request.query || '') : rawPath.slice(qIndex);
     const method = request.method || 'GET';
     const body = request.body === undefined ? null : request.body;
     state.requests.push({ path, method, body });
@@ -254,7 +273,100 @@ export function createMockWeread(options) {
     }
 
     if (path === '/web/login/renewal') {
-      return jsonResponse({ succ: 1 });
+      return okJson({ succ: 1 });
+    }
+
+    // ------------------------------------------------------------ 笔记 / 标注
+    if (path === '/web/book/bookmarklist') {
+      if (!notesData || notesData.disableNotes) return okJson({ errCode: -2012, errMsg: '登录超时' });
+      const bookId = new URL('http://x' + pathWithQuery(request)).searchParams.get('bookId');
+      if (bookId && bookId !== book.bookId) return okJson({ updated: [], chapters: [] });
+      return okJson({
+        updated: (notesData.highlights || []).map((item, index) => ({
+          bookmarkId: 'bm-' + index,
+          bookId: book.bookId,
+          chapterUid: item.chapterUid,
+          markText: item.markText,
+          range: item.range || String(index * 100 + 10) + '-' + String(index * 100 + 20),
+          colorStyle: 1,
+          type: 1,
+          createTime: item.createTime || 1765000000 + index,
+        })),
+        chapters: book.chapters.map((chapter) => ({
+          bookId: book.bookId,
+          chapterUid: chapter.uid,
+          chapterIdx: chapter.uid,
+          title: chapter.title,
+        })),
+      });
+    }
+
+    if (path === '/web/review/list/mine') {
+      if (!notesData || notesData.disableReviews) return okJson({ errCode: -2012, errMsg: '登录超时' });
+      const params = new URL('http://x' + pathWithQuery(request)).searchParams;
+      const synckey = Number(params.get('synckey') || 0);
+      const all = (notesData.reviews || []).map((item, index) => ({
+        review: {
+          reviewId: 'rv-' + index,
+          content: item.content,
+          abstract: item.abstract || '',
+          range: item.range || '',
+          chapterUid: item.chapterUid === undefined ? null : item.chapterUid,
+          chapterName: item.chapterName || '',
+          star: 0,
+          createTime: item.createTime || 1765001000 + index,
+        },
+      }));
+      // 同步游标：synckey=0 返回前半 + hasMore，之后返回剩余
+      const half = Math.ceil(all.length / 2);
+      if (all.length > 2 && synckey === 0) {
+        return okJson({ reviews: all.slice(0, half), hasMore: 1, synckey: 1, totalCount: all.length });
+      }
+      const rest = all.length > 2 && synckey === 1 ? all.slice(half) : all;
+      return okJson({ reviews: rest, hasMore: 0, synckey: 1, totalCount: all.length });
+    }
+
+    if (path === '/web/book/bestbookmarks') {
+      if (!notesData || notesData.disablePopular) return okJson({ errCode: -2012, errMsg: '登录超时' });
+      return okJson({
+        items: (notesData.popular || []).map((item, index) => ({
+          bookmarkId: 'hot-' + index,
+          bookId: book.bookId,
+          chapterUid: item.chapterUid,
+          range: item.range || 'pop-' + index,
+          markText: item.markText,
+          totalCount: item.totalCount === undefined ? 42 : item.totalCount,
+        })),
+        chapters: book.chapters.map((chapter) => ({
+          bookId: book.bookId,
+          chapterUid: chapter.uid,
+          chapterIdx: chapter.uid,
+          title: chapter.title,
+        })),
+      });
+    }
+
+    if (path === '/web/user/notebooks') {
+      if (!notesData || !notesData.notebooks) return okJson({ errCode: -2012, errMsg: '登录超时' });
+      const list = (notesData.notebooks || []).map((item, index) => ({
+        bookId: item.bookId,
+        book: { bookId: item.bookId, title: item.title, author: item.author || '' },
+        noteCount: item.noteCount === undefined ? 1 : item.noteCount,
+        reviewCount: item.reviewCount === undefined ? 1 : item.reviewCount,
+        bookmarkCount: 0,
+        sort: item.sort === undefined ? 1765000000 - index : item.sort,
+      }));
+      return okJson({ books: list, hasMore: 0, totalBookCount: list.length });
+    }
+
+    if (path === '/web/shelf/sync') {
+      const list = (notesData && notesData.notebooks ? notesData.notebooks : [
+        { bookId: book.bookId, title: book.title, author: book.author },
+      ]).map((item) => ({
+        bookId: item.bookId,
+        bookInfo: { bookId: item.bookId, title: item.title, author: item.author || '' },
+      }));
+      return okJson({ books: list, synckey: 1 });
     }
 
     const endpointMatch = /^\/web\/book\/chapter\/([et]_[0-3])$/.exec(path);
@@ -309,7 +421,7 @@ export function createMockWeread(options) {
       }
     }
     const result = await handle({
-      path: url.pathname,
+      path: url.pathname + url.search,
       method: (init && init.method) || 'GET',
       body: body,
     });

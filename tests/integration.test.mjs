@@ -112,6 +112,7 @@ async function setup(options) {
     pagePsvts: pagePsvts,
     freshPsvts: options.freshPsvts,
     truncateChapter: options.truncateChapter,
+    notes: options.notes,
   });
 
   const bookHash = encodeRef(book.bookId);
@@ -392,4 +393,193 @@ test('章节列表：加载过的章节可直接复制（剪贴板内容为完�
   assert.ok(ctx.window.__clipboard.includes('【本章开头-1】'), '复制内容应包含章节开头');
   assert.ok(ctx.window.__clipboard.includes('【本章结尾-1】'), '复制内容应包含章节结尾（不是试读）');
   assert.equal(ctx.window.__clipboard.includes('【本章开头-2】'), false, '只复制当前章节');
+});
+
+
+// ------------------------------------------------------------------ 笔记与标注
+
+function notesFixture() {
+  return {
+    highlights: [
+      { chapterUid: 1, markText: '第一章的划线原文', range: '10-20', createTime: 1765000000 },
+      { chapterUid: 2, markText: '第二章的划线原文', range: '30-40', createTime: 1765000100 },
+    ],
+    reviews: [
+      { content: '对第一章划线的想法', range: '10-20', abstract: '第一章的划线原文', chapterUid: 1 },
+      { content: '独立的读书感想', chapterUid: 2 },
+    ],
+    popular: [{ chapterUid: 1, markText: '大家都划的一句', totalCount: 88 }],
+    notebooks: [
+      { bookId: '43208843', title: '山谷来信', author: '测试作者', noteCount: 2, reviewCount: 2 },
+      { bookId: '900002', title: '第二本书', author: '作者二', noteCount: 1, reviewCount: 0 },
+    ],
+  };
+}
+
+test('笔记：导出全文时按章节分组附带在同一文件里（不产生独立笔记文件）', async (t) => {
+  const book = {
+    bookId: '43208843',
+    title: '山谷来信',
+    author: '测试作者',
+    format: 'epub',
+    chapters: makeChapters(2, 'epub'),
+  };
+
+  const ctx = await setup({
+    book: book,
+    notes: notesFixture(),
+    settings: { includeNotes: true, includePopular: false },
+  });
+  t.after(() => ctx.dom.window.close());
+
+  await bootAndWaitReady(ctx);
+
+  // 默认「附带我的划线与想法」为开，「热门划线」为关
+  const notesToggle = ctx.ui.root.querySelector('#wrx-include-notes');
+  const popularToggle = ctx.ui.root.querySelector('#wrx-include-popular');
+  assert.equal(notesToggle.checked, true);
+  assert.equal(popularToggle.checked, false);
+  assert.equal(popularToggle.disabled, false);
+
+  click(ctx.window, ctx.ui.exportButton);
+  await waitFor(() => !ctx.ui.resultEl.hidden, { label: '出现导出结果', timeout: 25000 });
+
+  assert.equal(ctx.window.__blobs.length, 1, '只能下载一个文件（正文 + 笔记在同一文件）');
+  assert.equal(ctx.window.__downloads[0].filename, '山谷来信.md');
+
+  const content = await readBlobText(ctx.window.__blobs[0]);
+  assert.ok(content.includes('【本章结尾-2】'), '正文完整');
+  assert.ok(content.includes('笔记与标注'), '含笔记小节');
+  assert.ok(content.includes('第一章的划线原文'), '含第一章划线');
+  assert.ok(content.includes('第二章的划线原文'), '含第二章划线');
+  assert.ok(content.includes('对第一章划线的想法'), '含关联想法');
+  assert.ok(content.includes('独立的读书感想'), '含独立想法');
+  assert.ok(!content.includes('大家都划的一句'), '未勾选热门划线时不应包含');
+
+  assert.match(ctx.ui.resultEl.textContent, /笔记：我的划线 2 条 · 我的想法 2 条/);
+
+  const paths = ctx.mock.state.requests.map((r) => r.path);
+  assert.ok(paths.some((p) => p.startsWith('/web/book/bookmarklist')), '请求划线接口');
+  assert.ok(paths.some((p) => p.startsWith('/web/review/list/mine')), '请求想法接口');
+  assert.ok(!paths.some((p) => p.startsWith('/web/book/bestbookmarks')), '未请求热门划线');
+});
+
+test('笔记：热门划线为可选开关，勾选后才加入同一文件', async (t) => {
+  const book = {
+    bookId: '43208843',
+    title: '山谷来信',
+    author: '测试作者',
+    format: 'epub',
+    chapters: makeChapters(2, 'epub'),
+  };
+
+  const ctx = await setup({
+    book: book,
+    notes: notesFixture(),
+    settings: { includeNotes: true, includePopular: true },
+  });
+  t.after(() => ctx.dom.window.close());
+
+  await bootAndWaitReady(ctx);
+  assert.equal(ctx.ui.root.querySelector('#wrx-include-popular').checked, true);
+
+  click(ctx.window, ctx.ui.exportButton);
+  await waitFor(() => !ctx.ui.resultEl.hidden, { label: '出现导出结果', timeout: 25000 });
+
+  const content = await readBlobText(ctx.window.__blobs[0]);
+  assert.ok(content.includes('大家都划的一句'), '含热门划线');
+  assert.ok(content.includes('88 人划线'), '含划线人数');
+  assert.match(ctx.ui.resultEl.textContent, /热门划线 1 条/);
+});
+
+test('笔记：关闭开关后导出内容完全不含笔记小节', async (t) => {
+  const book = {
+    bookId: '43208843',
+    title: '山谷来信',
+    author: '测试作者',
+    format: 'epub',
+    chapters: makeChapters(2, 'epub'),
+  };
+
+  const ctx = await setup({
+    book: book,
+    notes: notesFixture(),
+    settings: { includeNotes: false },
+  });
+  t.after(() => ctx.dom.window.close());
+
+  await bootAndWaitReady(ctx);
+  assert.equal(ctx.ui.root.querySelector('#wrx-include-popular').disabled, true, '主开关关闭时热门划线禁用');
+
+  click(ctx.window, ctx.ui.exportButton);
+  await waitFor(() => !ctx.ui.resultEl.hidden, { label: '出现导出结果', timeout: 25000 });
+
+  const content = await readBlobText(ctx.window.__blobs[0]);
+  assert.ok(!content.includes('笔记与标注'));
+  assert.ok(!content.includes('第一章的划线原文'));
+  assert.equal(
+    ctx.mock.state.requests.filter((r) => r.path.startsWith('/web/book/bookmarklist')).length,
+    0
+  );
+});
+
+test('笔记：全书架批量导出生成一个文件、按书分组', async (t) => {
+  const book = {
+    bookId: '43208843',
+    title: '山谷来信',
+    author: '测试作者',
+    format: 'epub',
+    chapters: makeChapters(2, 'epub'),
+  };
+
+  const ctx = await setup({
+    book: book,
+    notes: notesFixture(),
+    settings: { includeNotes: true },
+  });
+  t.after(() => ctx.dom.window.close());
+
+  await bootAndWaitReady(ctx);
+  const shelfButton = ctx.ui.root.querySelector('[data-act="export-shelf"]');
+  assert.equal(shelfButton.disabled, false, '初始化后全书架按钮可用');
+
+  click(ctx.window, shelfButton);
+  await waitFor(() => !ctx.ui.resultEl.hidden, { label: '出现导出结果', timeout: 30000 });
+
+  assert.equal(ctx.window.__blobs.length, 1, '全书架只生成一个文件');
+  assert.equal(ctx.window.__downloads[0].filename, '微信读书 - 全书架笔记合集.md');
+
+  const content = await readBlobText(ctx.window.__blobs[0]);
+  assert.ok(content.includes('微信读书 · 笔记合集'), '含合集标题');
+  assert.ok(content.includes('共 2 本书'), '含汇总');
+  assert.ok(content.includes('山谷来信'), '第一本书分组');
+  assert.ok(content.includes('第二本书'), '第二本书分组');
+  assert.ok(content.includes('第一章的划线原文'), '含笔记内容');
+});
+
+test('笔记：接口不可用时显示明确提示，正文导出不受影响', async (t) => {
+  const book = {
+    bookId: '43208843',
+    title: '山谷来信',
+    author: '测试作者',
+    format: 'epub',
+    chapters: makeChapters(2, 'epub'),
+  };
+
+  const ctx = await setup({
+    book: book,
+    notes: { disableNotes: true, disableReviews: true, disablePopular: true },
+    settings: { includeNotes: true },
+  });
+  t.after(() => ctx.dom.window.close());
+
+  await bootAndWaitReady(ctx);
+  click(ctx.window, ctx.ui.exportButton);
+  await waitFor(() => !ctx.ui.resultEl.hidden, { label: '出现导出结果', timeout: 25000 });
+
+  const content = await readBlobText(ctx.window.__blobs[0]);
+  assert.ok(content.includes('【本章结尾-2】'), '正文仍完整导出');
+  assert.ok(content.includes('划线接口不可用'), '文件内明确提示');
+  assert.ok(content.includes('个人想法接口不可用'), '文件内明确提示');
+  assert.match(ctx.ui.resultEl.textContent, /导出完成/);
 });

@@ -1,6 +1,6 @@
 {
   "name": "weread-exporter-extension",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "微信读书导出助手：Chrome 扩展（MV3），一键导出章节或整本书全文，支持 Markdown / HTML / TXT。",
   "keywords": [

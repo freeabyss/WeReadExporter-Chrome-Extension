@@ -9,7 +9,7 @@
   'use strict';
 
   const WRX = (root.__WRX__ = root.__WRX__ || {});
-  WRX.VERSION = '1.0.0';
+  WRX.VERSION = '1.1.0';
   WRX.APP_NAME = '微信读书导出助手';
   WRX.HOME = 'https://weread.qq.com/';
 

@@ -278,6 +278,22 @@
     'img { max-width: 100%; height: auto; display: block; margin: 1em auto; }',
     'blockquote { margin: 1em 0; padding: .2em 1em; border-left: 3px solid #d1d5db; color: #4b5563; }',
     'ruby rt { font-size: .55em; color: #6b7280; }',
+    /* 笔记与标注 */
+    'section.notes { margin: 3em 0 0; padding-top: 1.2em; border-top: 2px solid #e5e7eb; }',
+    'section.notes > h2 { margin: 0 0 .4em; }',
+    '.notes-summary { color: #6b7280; font-size: .9em; text-indent: 0; margin: 0 0 1.5em; }',
+    '.note-chapter { margin: 0 0 2em; }',
+    '.note-chapter > h3 { font-size: 1.05em; color: #374151; margin: 0 0 .8em; }',
+    '.highlight-item, .popular-item { margin: 0 0 1.1em; }',
+    'blockquote.highlight { margin: 0; padding: .3em 1em; border-left: 3px solid #2f6bff; background: rgba(47,107,255,.05); }',
+    'blockquote.highlight p { text-indent: 0; margin: 0; }',
+    '.note-time, .popular-count { text-indent: 0; margin: .35em 0 0; font-size: .8em; color: #6b7280; }',
+    'p.thought { text-indent: 0; margin: .4em 0 0 1em; padding-left: .7em; border-left: 2px solid #f59e0b; }',
+    '.thought-label { color: #b45309; font-weight: 600; }',
+    '.notes-warning { color: #9a6700; background: rgba(154,103,0,.07); padding: .6em .9em; border-radius: 8px; text-indent: 0; font-size: .9em; }',
+    '.shelf-book { margin: 0 0 3em; padding-bottom: 2em; border-bottom: 1px solid #e5e7eb; }',
+    '.shelf-book > h2 { margin: 0 0 .2em; }',
+    '.shelf-meta { color: #6b7280; font-size: .9em; text-indent: 0; margin: 0 0 1em; }',
     '@media (prefers-color-scheme: dark) {',
     '  body { color: #e6e6e6; background: #16181d; }',
     '  .book-meta { color: #9ca3af; }',
@@ -285,6 +301,11 @@
     '  .toc a { color: #7aa2ff; }',
     '  section.chapter { border-top-color: #2d3139; }',
     '  blockquote { border-left-color: #3f4650; color: #b3b9c4; }',
+    '  section.notes { border-top-color: #2d3139; }',
+    '  .note-chapter > h3 { color: #c9d1d9; }',
+    '  .notes-summary, .note-time, .popular-count, .shelf-meta { color: #9aa4b2; }',
+    '  blockquote.highlight { background: rgba(76,132,255,.09); }',
+    '  .shelf-book { border-bottom-color: #2d3139; }',
     '}',
   ].join('\n');
 
@@ -298,6 +319,291 @@
    * }} input
    * @returns {string}
    */
+  // ------------------------------------------------------------------ 笔记与标注
+
+  function notesSummary(notes) {
+    const stats = (notes && notes.stats) || {};
+    const parts = [];
+    parts.push('我的划线 ' + (stats.highlights || 0) + ' 条');
+    parts.push('我的想法 ' + (stats.thoughts || 0) + ' 条');
+    if (stats.popular) parts.push('热门划线 ' + stats.popular + ' 条');
+    return parts.join(' · ');
+  }
+
+  function notesGroups(notes) {
+    if (notes && Array.isArray(notes.groups) && notes.groups.length) return notes.groups;
+    // 兜底：调用方没预分组时，把所有笔记归入一组，不丢内容。
+    if (notes && ((notes.highlights || []).length || (notes.thoughts || []).length || (notes.popular || []).length)) {
+      return [{
+        uid: '__all__',
+        title: (notes.chapters && notes.chapters.length) ? '全书' : '笔记',
+        idx: 0,
+        highlights: notes.highlights || [],
+        thoughts: notes.thoughts || [],
+        popular: notes.popular || [],
+      }];
+    }
+    return [];
+  }
+
+  function oneLine(text) {
+    return String(text || '').replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  /** 渲染「笔记与标注」主体（不含文档外壳）。 */
+  function renderNotesBody(notes, format, level) {
+    const groups = notesGroups(notes);
+    const warnings = (notes && notes.warnings) || [];
+    if (format === 'html') return renderNotesHtml(notes, groups, warnings, level);
+    if (format === 'txt') return renderNotesTxt(notes, groups, warnings, level);
+    return renderNotesMarkdown(notes, groups, warnings, level);
+  }
+
+  function renderNotesMarkdown(notes, groups, warnings, level) {
+    const out = [];
+    out.push('> ' + notesSummary(notes));
+    for (const warning of warnings) out.push('> ⚠️ ' + warning);
+    if (!groups.length) {
+      out.push('> 暂无可导出的笔记与标注。');
+      return out.join('\n');
+    }
+
+    const heading = (n, text) => '#'.repeat(Math.min(n, 6)) + ' ' + text;
+
+    for (const group of groups) {
+      const block = [];
+      block.push(heading(level + 1, group.title));
+
+      for (const item of group.highlights) {
+        const lines = ['> ' + oneLine(item.text)];
+        if (item.time) lines.push('> — ' + item.time);
+        block.push(lines.join('\n'));
+        for (const thought of item.thoughts || []) {
+          block.push(
+            '💬 **我的想法**：' + oneLine(thought.content) +
+              (thought.time ? '（' + thought.time + '）' : '')
+          );
+        }
+      }
+
+      for (const thought of group.thoughts) {
+        const prefix = thought.abstract ? '> ' + oneLine(thought.abstract) + '\n\n' : '';
+        block.push(prefix + '💬 **我的想法**：' + oneLine(thought.content) +
+          (thought.time ? '（' + thought.time + '）' : ''));
+      }
+
+      if (group.popular.length) {
+        block.push('**热门划线（他人标注）**');
+        for (const item of group.popular) {
+          block.push('> ' + oneLine(item.text) + (item.count ? '（' + item.count + ' 人划线）' : ''));
+        }
+      }
+
+      out.push(block.join('\n\n'));
+    }
+    return out.join('\n\n');
+  }
+
+  function renderNotesTxt(notes, groups, warnings, level) {
+    const out = ['【' + notesSummary(notes) + '】'];
+    for (const warning of warnings) out.push('⚠️ ' + warning);
+    if (!groups.length) {
+      out.push('暂无可导出的笔记与标注。');
+      return out.join('\n');
+    }
+
+    for (const group of groups) {
+      out.push('');
+      out.push('— ' + group.title + ' —');
+      for (const item of group.highlights) {
+        out.push('  > ' + oneLine(item.text) + (item.time ? '  ' + item.time : ''));
+        for (const thought of item.thoughts || []) {
+          out.push('  💬 想法：' + oneLine(thought.content));
+        }
+      }
+      for (const thought of group.thoughts) {
+        if (thought.abstract) out.push('  > ' + oneLine(thought.abstract));
+        out.push('  💬 想法：' + oneLine(thought.content));
+      }
+      if (group.popular.length) {
+        out.push('  热门划线（他人标注）：');
+        for (const item of group.popular) {
+          out.push('  > ' + oneLine(item.text) + (item.count ? '（' + item.count + ' 人划线）' : ''));
+        }
+      }
+    }
+    return out.join('\n');
+  }
+
+  function renderNotesHtml(notes, groups, warnings, level) {
+    const out = [];
+    out.push('<p class="notes-summary">' + escapeHtml(notesSummary(notes)) + '</p>');
+    for (const warning of warnings) {
+      out.push('<p class="notes-warning">⚠️ ' + escapeHtml(warning) + '</p>');
+    }
+    if (!groups.length) {
+      out.push('<p class="notes-summary">暂无可导出的笔记与标注。</p>');
+      return out.join('\n');
+    }
+
+    for (const group of groups) {
+      const block = [];
+      block.push('<section class="note-chapter">');
+      block.push('<h3>' + escapeHtml(group.title) + '</h3>');
+
+      for (const item of group.highlights) {
+        block.push('<div class="highlight-item">');
+        block.push('<blockquote class="highlight"><p>' + escapeHtml(oneLine(item.text)) + '</p></blockquote>');
+        if (item.time) block.push('<p class="note-time">' + escapeHtml(item.time) + '</p>');
+        block.push('</div>');
+        for (const thought of item.thoughts || []) {
+          block.push(
+            '<p class="thought"><span class="thought-label">💬 我的想法</span> ' +
+              escapeHtml(oneLine(thought.content)) +
+              (thought.time ? ' <small>' + escapeHtml(thought.time) + '</small>' : '') +
+              '</p>'
+          );
+        }
+      }
+
+      for (const thought of group.thoughts) {
+        if (thought.abstract) {
+          block.push('<div class="highlight-item"><blockquote class="highlight"><p>' +
+            escapeHtml(oneLine(thought.abstract)) + '</p></blockquote></div>');
+        }
+        block.push('<p class="thought"><span class="thought-label">💬 我的想法</span> ' +
+          escapeHtml(oneLine(thought.content)) + '</p>');
+      }
+
+      if (group.popular.length) {
+        block.push('<h4>热门划线（他人标注）</h4>');
+        for (const item of group.popular) {
+          block.push('<div class="popular-item">');
+          block.push('<blockquote class="highlight"><p>' + escapeHtml(oneLine(item.text)) + '</p></blockquote>');
+          if (item.count) block.push('<p class="popular-count">' + item.count + ' 人划线</p>');
+          block.push('</div>');
+        }
+      }
+
+      block.push('</section>');
+      out.push(block.join('\n'));
+    }
+    return out.join('\n');
+  }
+
+  /**
+   * 生成「笔记与标注」小节（追加到书籍导出文档末尾）。
+   * @param {object} notes collectBookNotes() 的返回值
+   * @param {'md'|'html'|'txt'} format
+   * @param {{level?: number}} [options]
+   */
+  function buildNotesSection(notes, format, options) {
+    const opts = options || {};
+    const level = opts.level === undefined ? 2 : opts.level;
+    const title = '笔记与标注';
+    const body = renderNotesBody(notes, format, level);
+
+    if (format === 'html') {
+      return [
+        '<section class="notes" id="notes">',
+        '<h' + Math.min(level, 6) + '>' + title + '</h' + Math.min(level, 6) + '>',
+        body,
+        '</section>',
+      ].join('\n');
+    }
+    if (format === 'txt') {
+      return ['【' + title + '】', body].join('\n');
+    }
+    return ['#'.repeat(Math.min(level, 6)) + ' ' + title, body].join('\n\n');
+  }
+
+  /**
+   * 全书架批量导出：一个文件，按书分组（一个书本一组）。
+   * @param {{
+   *   format: 'md'|'html'|'txt',
+   *   books: Array<{title: string, author?: string, notes: object}>,
+   *   options?: {frontMatter?: boolean, now?: Date, warnings?: string[]}
+   * }} input
+   */
+  function buildShelfNotes(input) {
+    const format = input.format || 'md';
+    const books = (input.books || []).filter((book) => book && book.notes);
+    const options = input.options || {};
+    const now = formatDate(options.now || new Date());
+    const totalHighlights = books.reduce((n, b) => n + ((b.notes.stats && b.notes.stats.highlights) || 0), 0);
+    const totalThoughts = books.reduce((n, b) => n + ((b.notes.stats && b.notes.stats.thoughts) || 0), 0);
+    const summary = '共 ' + books.length + ' 本书 · 我的划线 ' + totalHighlights + ' 条 · 我的想法 ' + totalThoughts + ' 条';
+
+    if (format === 'html') {
+      const sections = books.map((book) => [
+        '<section class="shelf-book">',
+        '<h2>' + escapeHtml(book.title || '未知书名') + '</h2>',
+        book.author ? '<p class="shelf-meta">作者：' + escapeHtml(book.author) + '</p>' : '',
+        renderNotesHtml(book.notes, notesGroups(book.notes), book.notes.warnings || [], 2),
+        '</section>',
+      ].filter(Boolean).join('\n'));
+
+      const warnings = (options.warnings || []).map((w) =>
+        '<p class="notes-warning">⚠️ ' + escapeHtml(w) + '</p>'
+      );
+
+      return [
+        '<!DOCTYPE html>',
+        '<html lang="zh-CN">',
+        '<head>',
+        '<meta charset="utf-8">',
+        '<meta name="viewport" content="width=device-width, initial-scale=1">',
+        '<title>微信读书 · 笔记合集</title>',
+        '<style>',
+        HTML_STYLE,
+        '</style>',
+        '</head>',
+        '<body>',
+        '<div class="wrap">',
+        options.frontMatter !== false
+          ? '<header><h1 class="book-title">微信读书 · 笔记合集</h1><p class="book-meta">导出自微信读书 · ' +
+              escapeHtml(now) + ' · ' + escapeHtml(summary) + '</p></header>'
+          : '',
+        ...warnings,
+        ...sections,
+        '</div>',
+        '</body>',
+        '</html>',
+        '',
+      ].filter(Boolean).join('\n');
+    }
+
+    if (format === 'txt') {
+      const parts = [];
+      if (options.frontMatter !== false) {
+        parts.push(['微信读书 · 笔记合集', '导出自微信读书 · ' + now, summary, '='.repeat(24)].join('\n'));
+      }
+      for (const warning of options.warnings || []) parts.push('⚠️ ' + warning);
+      for (const book of books) {
+        const block = ['', '【' + (book.title || '未知书名') + '】'];
+        if (book.author) block.push('作者：' + book.author);
+        block.push(renderNotesBody(book.notes, 'txt', 3));
+        parts.push(block.join('\n'));
+      }
+      return parts.join('\n\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+    }
+
+    const parts = [];
+    if (options.frontMatter !== false) {
+      parts.push('# 微信读书 · 笔记合集');
+      parts.push('> 导出自微信读书 · ' + now + '\n> ' + summary);
+      parts.push('---');
+    }
+    for (const warning of options.warnings || []) parts.push('> ⚠️ ' + warning);
+    for (const book of books) {
+      const block = ['## ' + (book.title || '未知书名')];
+      if (book.author) block.push('> 作者：' + book.author);
+      block.push(renderNotesBody(book.notes, 'md', 3));
+      parts.push(block.join('\n\n'));
+    }
+    return parts.join('\n\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+  }
+
   function buildBook(input) {
     const format = input.format || 'md';
     const book = input.book || {};
@@ -325,6 +631,7 @@
       now: now,
       stats: stats,
       chapters: chapters,
+      notes: input.notes || null,
       options: options,
     };
 
@@ -371,6 +678,11 @@
       if (body) parts.push(body);
     }
 
+    if (meta.notes) {
+      parts.push('---');
+      parts.push(buildNotesSection(meta.notes, 'md', { level: 2 }));
+    }
+
     return parts.join('\n\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
   }
 
@@ -399,6 +711,10 @@
       }
       parts.push('【' + chapter.title + '】');
       if (body) parts.push(body);
+    }
+
+    if (meta.notes) {
+      parts.push(buildNotesSection(meta.notes, 'txt', { level: 2 }));
     }
 
     return parts.join('\n\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
@@ -475,6 +791,7 @@
       headerHtml,
       tocHtml,
       ...sections,
+      meta.notes ? buildNotesSection(meta.notes, 'html', { level: 2 }) : '',
       '</div>',
       '</body>',
       '</html>',
@@ -505,6 +822,9 @@
     htmlToMarkdown,
     htmlToPlainText,
     buildBook,
+    buildNotesSection,
+    buildShelfNotes,
+    renderNotesBody,
     sanitizeFileName,
     countChars,
     formatDate,
