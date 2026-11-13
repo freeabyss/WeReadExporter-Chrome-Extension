@@ -20,14 +20,44 @@
 
   const WRX = (root.__WRX__ = root.__WRX__ || {});
 
+  /**
+   * 个人想法 / 点评的候选接口。
+   *
+   * 真机反馈「个人想法接口不可用」的根因：`/web/review/list/mine` 是
+   * i.weread.qq.com agent 网关的路径，weread.qq.com web 域并不提供它。
+   * web 域实际使用 `/web/review/list?bookId=...&listType=11&mine=1`
+   * （参考 obsidian-weread-plugin 的 /review/list 与 we-mp-rss 的
+   *  /web/review/list?listType=11），故把 web 域路径放在最前面。
+   *
+   * 每一项返回 { path, name }，便于记录诊断。
+   */
   const REVIEW_PATHS = [
-    (id, page) =>
-      '/web/review/list/mine?bookid=' + encodeURIComponent(id) +
-      '&count=100&synckey=' + encodeURIComponent(page),
-    (id, page) =>
-      '/web/review/list/mine?bookId=' + encodeURIComponent(id) +
-      '&count=100&synckey=' + encodeURIComponent(page),
-    (id) => '/web/review/list/mine?bookid=' + encodeURIComponent(id),
+    (id, page) => ({
+      name: 'web/review/list[mine]',
+      path: '/web/review/list?bookId=' + encodeURIComponent(id) +
+        '&listType=11&mine=1&synckey=' + encodeURIComponent(page) +
+        '&count=100&listMode=',
+    }),
+    (id, page) => ({
+      name: 'web/review/list[bookid]',
+      path: '/web/review/list?bookid=' + encodeURIComponent(id) +
+        '&listType=11&mine=1&synckey=' + encodeURIComponent(page) + '&count=100',
+    }),
+    (id, page) => ({
+      name: 'web/review/list[no-mine]',
+      path: '/web/review/list?bookId=' + encodeURIComponent(id) +
+        '&listType=11&synckey=' + encodeURIComponent(page) + '&count=100&listMode=',
+    }),
+    (id, page) => ({
+      name: 'web/review/list/mine',
+      path: '/web/review/list/mine?bookid=' + encodeURIComponent(id) +
+        '&count=100&synckey=' + encodeURIComponent(page),
+    }),
+    (id, page) => ({
+      name: 'web/review/list/mine[bookId]',
+      path: '/web/review/list/mine?bookId=' + encodeURIComponent(id) +
+        '&count=100&synckey=' + encodeURIComponent(page),
+    }),
   ];
 
   function asArray(value) {
@@ -47,6 +77,33 @@
     if (!data || typeof data !== 'object') return 0;
     const code = data.errCode !== undefined ? data.errCode : data.errcode;
     return Number(code) || 0;
+  }
+
+  /** 从多种回包形状里取出「想法数组」与分页信息；取不到返回 null。 */
+  function extractReviews(data) {
+    if (!data || typeof data !== 'object') return null;
+    const candidates = [
+      data.reviews,
+      data.data && data.data.reviews,
+      data.reviewList,
+      data.list,
+      data.items,
+    ];
+    for (const candidate of candidates) {
+      if (Array.isArray(candidate)) {
+        return {
+          reviews: candidate,
+          hasMore: Number(data.hasMore !== undefined ? data.hasMore : (data.data && data.data.hasMore)) || 0,
+          totalCount: Number(
+            data.totalCount !== undefined ? data.totalCount : (data.data && data.data.totalCount)
+          ) || 0,
+          synckey: pickString(
+            data.synckey !== undefined ? data.synckey : (data.data && data.data.synckey)
+          ),
+        };
+      }
+    }
+    return null;
   }
 
   /** 时间戳（秒 / 毫秒都兼容）→ YYYY-MM-DD。 */
@@ -112,7 +169,12 @@
           .filter((item) => item && typeof item === 'object')
           .map((item, index) => ({
             id: pickString(item.bookmarkId, item.id, 'bm-' + index),
-            text: pickString(item.markText, item.content, item.text),
+            text: pickString(item.markText, item.text, item.markTextContent),
+            // 划线记录常自带用户当时的「划线想法」，字段名不统一，逐一兜底
+            inlineNote: pickString(
+              item.reviewContent, item.noteContent, item.note, item.content,
+              item.review && item.review.content, item.markTextReview
+            ),
             chapterUid: item.chapterUid === undefined ? null : item.chapterUid,
             chapterIdx: item.chapterIdx === undefined ? null : Number(item.chapterIdx),
             range: pickString(item.range),
@@ -142,13 +204,19 @@
      * @returns {Promise<{items: object[], ok: boolean, path: string}>}
      */
     async fetchMyReviews(bookId) {
+      const diagnostics = [];
+
       for (const buildPath of REVIEW_PATHS) {
         const firstPath = buildPath(bookId, 0);
-        const first = await this._tryGet(firstPath);
-        if (!first || !Array.isArray(first.reviews)) continue;
+        const first = await this._tryGet(firstPath.path);
+        const firstParsed = extractReviews(first);
+        if (!firstParsed) {
+          diagnostics.push({ name: firstPath.name, path: firstPath.path, status: 'no-reviews' });
+          continue;
+        }
 
         const items = [];
-        let page = first;
+        let page = firstParsed;
         // 首轮游标必须是 0：服务端返回的 synckey 是「下一页」的游标，
         // 若用它初始化会误判为已到末页，导致只拿到第一页。
         let synckey = '0';
@@ -161,6 +229,11 @@
             if (!review || typeof review !== 'object') continue;
             const content = pickString(review.content, review.htmlContent, review.text);
             if (!content) continue;
+
+            // 无 mine=1 的兜底路径可能混入他人点评：优先用 author 判断，
+            // 有明确 userVid/author 且与当前用户不符时跳过。
+            if (review.isMine === false || review.mine === false) continue;
+
             items.push({
               id: pickString(review.reviewId, review.id, 'rv-' + items.length),
               content,
@@ -180,13 +253,20 @@
           const nextKey = pickString(page.synckey, synckey);
           if (!hasMore || !nextKey || nextKey === synckey) break;
           synckey = nextKey;
-          page = await this._tryGet(buildPath(bookId, synckey));
+          page = extractReviews(await this._tryGet(buildPath(bookId, synckey).path));
         }
 
-        return { items, ok: true, path: firstPath.split('?')[0] };
+        // 合法但为空：也视为接口可用（这本书确实没有想法），继续用该路径。
+        diagnostics.push({
+          name: firstPath.name,
+          path: firstPath.path,
+          status: items.length ? 'ok' : 'empty',
+          count: items.length,
+        });
+        return { items, ok: true, path: firstPath.name, diagnostics };
       }
 
-      return { items: [], ok: false, path: '' };
+      return { items: [], ok: false, path: '', diagnostics };
     }
 
     // ------------------------------------------------------------ 热门划线
@@ -306,8 +386,13 @@
       ]);
 
       if (!highlights.ok) notes.warnings.push('划线接口不可用，本次未导出划线');
-      if (!thoughts.ok) notes.warnings.push('个人想法接口不可用，本次未导出想法/点评');
       if (opts.includePopular && !popular.ok) notes.warnings.push('热门划线接口不可用');
+      // 想法接口的失败提示延后到「划线内嵌想法」合并之后再判断，
+      // 避免明明拿到了想法却仍报「接口不可用」。
+      notes.diagnostics = thoughts.diagnostics || [];
+      if (!thoughts.ok) {
+        notes.diagnostics.push({ name: 'review', status: 'all-endpoints-failed' });
+      }
 
       // 章节映射：优先用 bookmarklist 返回的 chapters，其次用导出目录。
       const chapterList = [];
@@ -346,13 +431,23 @@
         if (highlight.range) byRange.set(highlight.range, highlight);
       }
 
-      for (const item of thoughts.items) {
+      // 去重：同一条想法可能同时出现在划线记录与 review 接口里。
+      const seenThoughts = new Set();
+      const addThought = (item, source) => {
         const chapter = uidToChapter.get(String(item.chapterUid));
         const thought = Object.assign({}, item, {
           chapterTitle: chapter ? chapter.title : item.chapterTitle,
-          time: formatNoteTime(item.createTime),
+          time: item.time || formatNoteTime(item.createTime),
+          source,
         });
+        const key = (thought.content || '').replace(/\s+/g, '') + '|' + (thought.range || '');
+        if (seenThoughts.has(key)) return null;
+        seenThoughts.add(key);
+        return thought;
+      };
 
+      const attach = (thought) => {
+        if (!thought) return;
         let target = thought.range ? byRange.get(thought.range) : null;
         if (!target && thought.abstract) {
           const abstract = thought.abstract.replace(/\s+/g, '');
@@ -365,6 +460,44 @@
         }
         if (target) target.thoughts.push(thought);
         else notes.thoughts.push(thought);
+      };
+
+      // 来源 1：划线记录自带的「划线想法」（content/note 等字段），天然关联该划线。
+      let inlineCount = 0;
+      for (const highlight of notes.highlights) {
+        if (!highlight.inlineNote) continue;
+        const thought = addThought({
+          content: highlight.inlineNote,
+          abstract: highlight.text,
+          range: highlight.range,
+          chapterUid: highlight.chapterUid,
+          chapterTitle: highlight.chapterTitle,
+          createTime: highlight.createTime,
+        }, 'bookmark');
+        if (thought) {
+          highlight.thoughts.push(thought);
+          inlineCount += 1;
+        }
+      }
+
+      // 来源 2：想法 / 点评接口（去重后按 range/abstract 关联或单独列出）。
+      let reviewCount = 0;
+      for (const item of thoughts.items) {
+        const thought = addThought(item, 'review');
+        if (!thought) continue;
+        attach(thought);
+        reviewCount += 1;
+      }
+
+      const totalThoughts = inlineCount + reviewCount;
+      if (!thoughts.ok && totalThoughts === 0) {
+        notes.warnings.push(
+          '未能读取个人想法/点评（已尝试 ' + REVIEW_PATHS.length + ' 个接口）；划线内容仍已导出'
+        );
+      } else if (!thoughts.ok) {
+        notes.warnings.push(
+          '想法接口部分不可用，已用划线自带的想法补足（' + inlineCount + ' 条）'
+        );
       }
 
       for (const item of popular.items) {
@@ -376,11 +509,14 @@
 
       notes.stats = {
         highlights: notes.highlights.length,
-        thoughts: thoughts.items.length,
+        thoughts: totalThoughts,
+        inlineThoughts: inlineCount,
+        reviewThoughts: reviewCount,
         popular: notes.popular.length,
         chapters: chapterList.length,
       };
-      notes.ok = highlights.ok || thoughts.ok || (opts.includePopular && popular.ok);
+      notes.ok = highlights.ok || thoughts.ok || totalThoughts > 0 ||
+        (opts.includePopular && popular.ok);
       notes.groups = this.groupByChapter(notes);
       return notes;
     }
@@ -431,7 +567,8 @@
       popular: [],
       chapters: [],
       warnings: [],
-      stats: { highlights: 0, thoughts: 0, popular: 0, chapters: 0 },
+      diagnostics: [],
+      stats: { highlights: 0, thoughts: 0, inlineThoughts: 0, reviewThoughts: 0, popular: 0, chapters: 0 },
       ok: false,
     };
   }

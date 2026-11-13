@@ -89,6 +89,8 @@ const NOTES = {
   notebooks: [
     { bookId: '43208843', title: '真实浏览器之书', author: '冒烟测试', noteCount: 2, reviewCount: 2 },
   ],
+  // 复现真机：旧的 /web/review/list/mine 不可用，只有 web 域 /web/review/list 可用
+  legacyMineFails: true,
 };
 
 // ---------------------------------------------------------------- 扩展副本
@@ -314,7 +316,7 @@ async function main() {
       const host = document.getElementById('wrx-host');
       if (!host || !host.shadowRoot) return { ready: false, why: 'no host' };
       const root = host.shadowRoot;
-      const button = root.querySelector('[data-act="export-book"]');
+      const button = root.querySelector('[data-act="export"]');
       return {
         ready: !!(button && !button.disabled),
         title: root.querySelector('.book-title').textContent,
@@ -334,10 +336,19 @@ async function main() {
     assert(ready && ready.ready, '扩展未就绪：' + JSON.stringify(ready));
     log('面板已就绪：' + ready.title + ' / ' + ready.sub);
 
-    // 点击「导出全文」
+    // 第一次导出：只勾「全文」，验证与笔记解耦
     await evaluate(`(() => {
       const root = document.getElementById('wrx-host').shadowRoot;
-      root.querySelector('[data-act="export-book"]').click();
+      const notes = root.querySelector('#wrx-export-notes');
+      if (notes.checked) notes.click();
+      const full = root.querySelector('#wrx-export-full');
+      if (!full.checked) full.click();
+      return true;
+    })()`);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    await evaluate(`(() => {
+      const root = document.getElementById('wrx-host').shadowRoot;
+      root.querySelector('[data-act="export"]').click();
       return true;
     })()`);
 
@@ -406,13 +417,22 @@ async function main() {
 
     const notePathsBefore = mock.state.requests.map((request) => request.path);
     assert(!notePathsBefore.some((p) => p.startsWith('/web/book/bookmarklist')), '全文导出不应请求划线接口');
-    assert(!notePathsBefore.some((p) => p.startsWith('/web/review/list/mine')), '全文导出不应请求想法接口');
+    assert(!notePathsBefore.some((p) => p.startsWith('/web/review/list')), '全文导出不应请求想法接口');
     log('全文导出未触发任何笔记接口');
 
-    // 独立功能：点「导出笔记」，应下载第二个、独立的文件
+    // 独立功能：取消「全文」只勾「笔记」，点「导出」应下载第二个、独立的文件
     await evaluate(`(() => {
       const root = document.getElementById('wrx-host').shadowRoot;
-      root.querySelector('[data-act="export-notes"]').click();
+      const full = root.querySelector('#wrx-export-full');
+      if (full.checked) full.click();
+      const notes = root.querySelector('#wrx-export-notes');
+      if (!notes.checked) notes.click();
+      return { full: full.checked, notes: notes.checked };
+    })()`);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    await evaluate(`(() => {
+      const root = document.getElementById('wrx-host').shadowRoot;
+      root.querySelector('[data-act="export"]').click();
       return true;
     })()`);
 
@@ -433,9 +453,37 @@ async function main() {
 
     const notePaths = mock.state.requests.map((request) => request.path);
     assert(notePaths.some((p) => p.startsWith('/web/book/bookmarklist')), '应请求划线接口');
-    assert(notePaths.some((p) => p.startsWith('/web/review/list/mine')), '应请求想法接口');
+    assert(notePaths.some((p) => p.startsWith('/web/review/list')), '应请求想法接口（web 域 /web/review/list）');
     assert(!notePaths.some((p) => p.startsWith('/web/book/bestbookmarks')), '未勾选时不应请求热门划线');
     log('笔记接口校验通过：划线 + 想法，未请求热门划线');
+
+    // 勾选「全文」+「笔记」：一次点击产出两个文件
+    await evaluate(`(() => {
+      const root = document.getElementById('wrx-host').shadowRoot;
+      const full = root.querySelector('#wrx-export-full');
+      if (!full.checked) full.click();
+      return true;
+    })()`);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    await evaluate(`(() => {
+      const root = document.getElementById('wrx-host').shadowRoot;
+      root.querySelector('[data-act="export"]').click();
+      return true;
+    })()`);
+
+    const bothNotes = path.join(downloadDir, notesName);
+    const bothBook = path.join(downloadDir, book.title + '.md');
+    const startedBoth = Date.now();
+    let bothOk = false;
+    while (Date.now() - startedBoth < 30000) {
+      if (fs.existsSync(bothNotes) && fs.existsSync(bothBook)) {
+        bothOk = true;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    assert(bothOk, '勾选全文+笔记时应同时产出两个文件');
+    log('合并导出校验通过：一次点击产出正文 + 笔记两个文件');
 
     // 复制章节：导出过程是异步的，此时已经没有用户手势，
     // 必须确认剪贴板兜底方案能正常工作。

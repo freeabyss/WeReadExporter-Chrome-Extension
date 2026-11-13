@@ -150,7 +150,10 @@ function pathWithQuery(request) {
  *     notebooks?: Array<{bookId: string, title: string, author?: string, noteCount?: number, reviewCount?: number, sort?: number}>,
  *     disableNotes?: boolean,
  *     disableReviews?: boolean,
- *     disablePopular?: boolean
+ *     disablePopular?: boolean,
+ *     legacyMineFails?: boolean,   // 复现真机：/web/review/list/mine 不可用，只有 web 域 /web/review/list 可用
+ *     inlineNotes?: Record<string, string>,  // 划线自带的想法，key=markText
+ *     reviewShape?: 'wrapped' | 'flat' | 'nested'
  *   }
  * }} options
  */
@@ -171,6 +174,15 @@ export function createMockWeread(options) {
 
   function chapterByEncoded(value) {
     return book.chapters.find((chapter) => encodeRef(chapter.uid) === value) || null;
+  }
+
+  function inlineNoteFor(item) {
+    if (!notesData) return '';
+    if (item.inlineNote) return item.inlineNote;
+    if (notesData.inlineNotes && notesData.inlineNotes[item.markText]) {
+      return notesData.inlineNotes[item.markText];
+    }
+    return '';
   }
 
   function validate(body) {
@@ -291,6 +303,8 @@ export function createMockWeread(options) {
           colorStyle: 1,
           type: 1,
           createTime: item.createTime || 1765000000 + index,
+          // 真机上划线记录常自带用户当时的想法
+          ...(inlineNoteFor(item) ? { content: inlineNoteFor(item) } : {}),
         })),
         chapters: book.chapters.map((chapter) => ({
           bookId: book.bookId,
@@ -301,12 +315,20 @@ export function createMockWeread(options) {
       });
     }
 
-    if (path === '/web/review/list/mine') {
-      if (!notesData || notesData.disableReviews) return okJson({ errCode: -2012, errMsg: '登录超时' });
+    if (path === '/web/review/list' || path === '/web/review/list/mine') {
+      const isLegacy = path === '/web/review/list/mine';
+      // 真机复现：agent 网关路径不可用，但 web 域 /web/review/list?listType=11&mine=1 可用
+      const unavailable =
+        !notesData ||
+        notesData.disableReviews ||
+        (isLegacy && notesData.legacyMineFails);
+      if (unavailable) return okJson({ errCode: -2012, errMsg: '登录超时' });
+
       const params = new URL('http://x' + pathWithQuery(request)).searchParams;
       const synckey = Number(params.get('synckey') || 0);
-      const all = (notesData.reviews || []).map((item, index) => ({
-        review: {
+      const shape = notesData.reviewShape || 'wrapped';
+      const reviews = (notesData.reviews || []).map((item, index) => {
+        const review = {
           reviewId: 'rv-' + index,
           content: item.content,
           abstract: item.abstract || '',
@@ -315,15 +337,19 @@ export function createMockWeread(options) {
           chapterName: item.chapterName || '',
           star: 0,
           createTime: item.createTime || 1765001000 + index,
-        },
-      }));
-      // 同步游标：synckey=0 返回前半 + hasMore，之后返回剩余
-      const half = Math.ceil(all.length / 2);
-      if (all.length > 2 && synckey === 0) {
-        return okJson({ reviews: all.slice(0, half), hasMore: 1, synckey: 1, totalCount: all.length });
-      }
-      const rest = all.length > 2 && synckey === 1 ? all.slice(half) : all;
-      return okJson({ reviews: rest, hasMore: 0, synckey: 1, totalCount: all.length });
+        };
+        if (shape === 'flat') return review;
+        return { review };
+      });
+
+      const half = Math.ceil(reviews.length / 2);
+      const pageReviews =
+        reviews.length > 2 && synckey === 0 ? reviews.slice(0, half) :
+        reviews.length > 2 && synckey === 1 ? reviews.slice(half) : reviews;
+      const hasMore = reviews.length > 2 && synckey === 0 ? 1 : 0;
+      const payload = { reviews: pageReviews, hasMore, synckey: 1, totalCount: reviews.length };
+      // nested 形状：包在 data 里，验证 extractReviews 的兜底
+      return okJson(shape === 'nested' ? { data: payload } : payload);
     }
 
     if (path === '/web/book/bestbookmarks') {

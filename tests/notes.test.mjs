@@ -96,7 +96,7 @@ test('collectBookNotes：想法通过 range 与 abstract 关联到划线，未�
   assert.match(first.time, /^\d{4}-\d{2}-\d{2}$/, '时间应格式化');
 });
 
-test('collectBookNotes：接口不可用时记录明确 warning，不静默当空笔记', async () => {
+test('collectBookNotes：接口全不可用时记录明确 warning 与诊断，不静默当空笔记', async () => {
   const book = makeBook();
   const service = new WRX.WereadNotes(
     makeNotesClient(book, { notes: { disableNotes: true, disableReviews: true, disablePopular: true } })
@@ -105,9 +105,58 @@ test('collectBookNotes：接口不可用时记录明确 warning，不静默当�
 
   assert.equal(notes.stats.highlights, 0);
   assert.ok(notes.warnings.some((w) => /划线接口不可用/.test(w)));
-  assert.ok(notes.warnings.some((w) => /个人想法接口不可用/.test(w)));
+  assert.ok(notes.warnings.some((w) => /未能读取个人想法\/点评/.test(w)), '提示应说明尝试过多个接口');
+  assert.ok(!notes.warnings.some((w) => /个人想法接口不可用/.test(w)), '不应再出现旧的绝对化文案');
   assert.ok(notes.warnings.some((w) => /热门划线接口不可用/.test(w)));
+  assert.ok(notes.diagnostics.some((d) => d.status === 'all-endpoints-failed'));
   assert.equal(notes.groups.length, 0);
+});
+
+test('真机复现：/web/review/list/mine 不可用时，web 域 /web/review/list 仍能拿到想法', async () => {
+  const book = makeBook();
+  const client = makeNotesClient(book, { notes: { ...notesFixture(), legacyMineFails: true } });
+  const service = new WRX.WereadNotes(client);
+  const notes = await service.collectBookNotes(book.bookId, { bookTitle: book.title });
+
+  assert.equal(notes.stats.thoughts, 4, '4 条想法全部拿到');
+  assert.equal(notes.warnings.length, 0, '不应再提示「个人想法接口不可用」');
+  assert.equal(notes.diagnostics[0].status, 'ok');
+  assert.match(notes.diagnostics[0].name, /web\/review\/list\[mine\]/);
+  assert.ok(client.mock.state.requests.some((r) => r.path === '/web/review/list'),
+    '第一个候选应是 web 域 /web/review/list');
+});
+
+test('想法回包形状兜底：flat 与 nested(data) 都能解析', async () => {
+  for (const shape of ['flat', 'nested']) {
+    const book = makeBook();
+    const service = new WRX.WereadNotes(
+      makeNotesClient(book, { notes: { ...notesFixture(), reviewShape: shape, legacyMineFails: true } })
+    );
+    const notes = await service.collectBookNotes(book.bookId, { bookTitle: book.title });
+    assert.equal(notes.stats.thoughts, 4, shape + ' 应解析出 4 条想法');
+  }
+});
+
+test('划线自带想法：review 接口全挂时也能导出想法，且不与接口想法重复', async () => {
+  const book = makeBook();
+  const fixture = notesFixture();
+  const service = new WRX.WereadNotes(makeNotesClient(book, {
+    notes: {
+      ...fixture,
+      disableReviews: true,
+      inlineNotes: {
+        '第一句划线原文': '划线时写下的想法',
+        '第二句划线原文': '另一条划线想法',
+      },
+    },
+  }));
+  const notes = await service.collectBookNotes(book.bookId, { bookTitle: book.title });
+
+  assert.equal(notes.stats.inlineThoughts, 2);
+  assert.equal(notes.stats.thoughts, 2);
+  assert.ok(notes.highlights[0].thoughts.some((t) => /划线时写下的想法/.test(t.content)));
+  assert.ok(notes.warnings.some((w) => /已用划线自带的想法补足/.test(w)), '提示应为「已补足」而非「失败」');
+  assert.ok(!notes.warnings.some((w) => /本次未导出想法/.test(w)));
 });
 
 test('collectBookNotes：热门划线为可选，默认不请求', async () => {

@@ -21,7 +21,10 @@
     maxAttempts: 3,
     refreshEvery: 40,
     frontMatter: true,
-    includePopular: false,
+    // 导出选项：三个可多选的独立选项
+    exportFullText: true,   // 一、全文
+    exportNotes: true,      // 二、笔记
+    includePopular: false,  // 三、附带热门笔记（他人标注）
   };
 
   const STATUS_TEXT = {
@@ -353,7 +356,11 @@
     settings.maxAttempts = clamp(Number(settings.maxAttempts) || 3, 1, 5);
     settings.refreshEvery = clamp(Number(settings.refreshEvery) || 0, 0, 500);
     settings.frontMatter = settings.frontMatter !== false;
+    settings.exportFullText = settings.exportFullText !== false;
+    settings.exportNotes = settings.exportNotes !== false;
     settings.includePopular = settings.includePopular === true;
+    // 至少保留一个导出目标，避免点了「导出」却什么也不做
+    if (!settings.exportFullText && !settings.exportNotes) settings.exportFullText = true;
     return settings;
   }
 
@@ -487,19 +494,24 @@
                 <button data-fmt="html" role="radio" aria-checked="false">HTML</button>
                 <button data-fmt="txt" role="radio" aria-checked="false">TXT</button>
               </div>
-              <div class="btn-row primary-actions">
-                <button class="primary split" type="button" data-act="export-book" disabled>导出全文</button>
-                <button class="primary split secondary" type="button" data-act="export-notes" disabled>导出笔记</button>
-              </div>
-              <fieldset class="notes-opts" aria-describedby="wrx-notes-help">
-                <legend>笔记选项</legend>
+              <fieldset class="notes-opts" aria-describedby="wrx-export-help">
+                <legend>导出内容（可多选）</legend>
+                <label class="check">
+                  <input type="checkbox" data-opt="exportFullText" id="wrx-export-full">
+                  <span>全文</span>
+                </label>
+                <label class="check">
+                  <input type="checkbox" data-opt="exportNotes" id="wrx-export-notes">
+                  <span>笔记</span>
+                </label>
                 <label class="check">
                   <input type="checkbox" data-opt="includePopular" id="wrx-include-popular" aria-describedby="wrx-popular-help">
-                  <span>附带热门划线（他人标注）</span>
+                  <span>附带热门笔记（他人标注）</span>
                 </label>
-                <p class="hint" id="wrx-notes-help">「导出笔记」独立下载一个《书名 · 笔记与标注》文件，按章节分组；与「导出全文」互不依赖。</p>
-                <p class="hint" id="wrx-popular-help">热门划线为公开内容，服务端固定返回前 20 条。</p>
+                <p class="hint" id="wrx-export-help">勾选「全文」下载《书名》，勾选「笔记」下载《书名 - 笔记与标注》，两者都勾则各下一个文件。</p>
+                <p class="hint" id="wrx-popular-help">热门笔记为公开内容，服务端固定返回前 20 条；仅在勾选「笔记」时生效。</p>
               </fieldset>
+              <button class="primary" type="button" data-act="export" disabled>导出</button>
               <button class="shelf-btn" type="button" data-act="export-shelf" disabled>导出全书架笔记（按书分组，可选）</button>
               <div class="progress" hidden>
                 <div class="bar"><i></i></div>
@@ -584,6 +596,22 @@
             Number(input.max) || 9999
           );
         }
+        // 全文/笔记至少保留一项：用户取消最后一项时回退并提示
+        if (
+          (key === 'exportFullText' || key === 'exportNotes') &&
+          !this.settings.exportFullText &&
+          !this.settings.exportNotes
+        ) {
+          this.settings[key] = true;
+          input.checked = true;
+          this.toast('「全文」和「笔记」至少保留一项', 'error', 2400);
+        }
+
+        // 「附带热门笔记」依赖「笔记」：勾选笔记时自动生效，取消笔记时自动关闭
+        if (key === 'exportNotes' && !this.settings.exportNotes) {
+          this.settings.includePopular = false;
+        }
+
         writeStorage(STORAGE_KEYS.settings, this.settings);
         this._syncNotesOptions();
         if (typeof this.handlers.onSettingsChange === 'function') {
@@ -608,11 +636,8 @@
         case 'save-current':
           if (handler.onSaveCurrent) handler.onSaveCurrent();
           break;
-        case 'export-book':
-          if (handler.onExportBook) handler.onExportBook();
-          break;
-        case 'export-notes':
-          if (handler.onExportNotes) handler.onExportNotes();
+        case 'export':
+          if (handler.onExport) handler.onExport(this.getOptions());
           break;
         case 'export-shelf':
           if (handler.onExportShelfNotes) handler.onExportShelfNotes();
@@ -884,8 +909,7 @@
 
     setBusy(busy) {
       this.busy = !!busy;
-      this._setDisabled('[data-act="export-book"]', this.busy);
-      this._setDisabled('[data-act="export-notes"]', this.busy || !this.shelfReady);
+      this._setDisabled('[data-act="export"]', this.busy || !this.shelfReady);
       this._setDisabled('[data-act="export-shelf"]', this.busy || !this.shelfReady);
       this._setDisabled('[data-act="copy-current"]', this.busy || !this.currentChapter);
       this._setDisabled('[data-act="save-current"]', this.busy || !this.currentChapter);
@@ -948,7 +972,7 @@
     /** 全书架笔记按钮是否可用（初始化完成后解锁）。 */
     setShelfReady(ready) {
       this.shelfReady = !!ready;
-      this._setDisabled('[data-act="export-notes"]', this.busy || !this.shelfReady);
+      this._setDisabled('[data-act="export"]', this.busy || !this.shelfReady);
       this._setDisabled('[data-act="export-shelf"]', this.busy || !this.shelfReady);
     }
 
@@ -1106,6 +1130,8 @@
         maxAttempts: this.settings.maxAttempts,
         refreshEvery: this.settings.refreshEvery,
         frontMatter: this.settings.frontMatter,
+        exportFullText: this.settings.exportFullText,
+        exportNotes: this.settings.exportNotes,
         includePopular: this.settings.includePopular,
       };
     }
@@ -1136,10 +1162,34 @@
       this._syncNotesOptions();
     }
 
-    /** 热门划线只作用于笔记类导出，导出全文时不受影响。 */
+    /**
+     * 同步三个导出选项的依赖关系：
+     * - 「附带热门笔记」只在勾选「笔记」时可用；
+     * - 「全文」与「笔记」至少保留一个（当前用户操作的这一项不可取消）。
+     */
     _syncNotesOptions() {
+      const full = this.root.querySelector('#wrx-export-full');
+      const notes = this.root.querySelector('#wrx-export-notes');
       const popular = this.root.querySelector('#wrx-include-popular');
-      if (popular) popular.disabled = false;
+      if (!full || !notes) return;
+
+      full.checked = this.settings.exportFullText;
+      notes.checked = this.settings.exportNotes;
+
+      // 两个选项都不禁用：禁用未选中项会让用户无法切换（取消后卡死）。
+      // 「至少保留一项」的约束在 change 事件里处理。
+      full.disabled = false;
+      notes.disabled = false;
+      full.closest('label').title = '';
+      notes.closest('label').title = '';
+
+      if (popular) {
+        popular.disabled = !this.settings.exportNotes;
+        const label = popular.closest('label');
+        if (label) {
+          label.title = this.settings.exportNotes ? '' : '请先勾选「笔记」';
+        }
+      }
     }
 
     _setDisabled(selector, disabled) {
