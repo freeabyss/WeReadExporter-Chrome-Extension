@@ -15,7 +15,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test tests/",
+    "test": "node --test tests/*.test.mjs",
     "test:chrome": "node tools/chrome-smoke.mjs",
     "icons": "python3 tools/make-icons.py",
     "store:assets": "python3 tools/make-store-assets.py",
